@@ -14065,14 +14065,30 @@ static bool ggml_backend_vk_cpy_tensor_async(ggml_backend_t backend_src, ggml_ba
                     snprintf(fdinfo_path, sizeof(fdinfo_path), "/proc/self/fdinfo/%d", sync_fd);
                     FILE * f = fopen(fdinfo_path, "r");
                     if (f) {
+                        int line_count = 0;
                         char line[256];
                         while (fgets(line, sizeof(line), f)) {
-                            // Remove trailing newline
                             size_t len = strlen(line);
                             if (len > 0 && line[len-1] == '\n') line[len-1] = '\0';
                             GGML_LOG_DEBUG("ggml_vulkan: fdinfo: %s\n", line);
+                            line_count++;
+                        }
+                        if (line_count == 0) {
+                            GGML_LOG_WARN("ggml_vulkan: fdinfo: file was empty for fd=%d\n", sync_fd);
                         }
                         fclose(f);
+                    } else {
+                        GGML_LOG_WARN("ggml_vulkan: fdinfo: failed to open %s (errno=%d)\n",
+                                      fdinfo_path, errno);
+                    }
+
+                    // Also check via readlink what type of fd this is
+                    char fd_link_path[64], fd_target[256];
+                    snprintf(fd_link_path, sizeof(fd_link_path), "/proc/self/fd/%d", sync_fd);
+                    ssize_t link_len = readlink(fd_link_path, fd_target, sizeof(fd_target) - 1);
+                    if (link_len > 0) {
+                        fd_target[link_len] = '\0';
+                        GGML_LOG_DEBUG("ggml_vulkan: fd %d -> %s\n", sync_fd, fd_target);
                     }
                 }
 #endif
