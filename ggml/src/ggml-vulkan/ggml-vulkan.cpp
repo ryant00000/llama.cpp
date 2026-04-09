@@ -13406,6 +13406,12 @@ static void ggml_vk_graph_cleanup(ggml_backend_vk_context * ctx) {
 
     GGML_LOG_DEBUG("ggml_vulkan: graph_cleanup(%s) binary_semaphore_idx=%zu\n",
                    ctx->name.c_str(), ctx->binary_semaphore_idx);
+    // Destroy binary semaphores rather than pooling — drivers may hold
+    // imported sync_fd handles until the semaphore is destroyed.
+    for (size_t i = 0; i < ctx->gc.semaphores.size(); i++) {
+        ctx->device->device.destroySemaphore(ctx->gc.semaphores[i].s);
+    }
+    ctx->gc.semaphores.clear();
     ctx->binary_semaphore_idx = 0;
 
     for (auto& [peer, staging] : ctx->device->peer_staging) {
