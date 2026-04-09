@@ -41,6 +41,7 @@ DispatchLoaderDynamic & ggml_vk_default_dispatcher();
 #include <thread>
 
 #if !defined(_WIN32)
+#include <dirent.h>
 #include <fcntl.h>
 #include <unistd.h>
 #endif
@@ -14053,43 +14054,18 @@ static bool ggml_backend_vk_cpy_tensor_async(ggml_backend_t backend_src, ggml_ba
                                sync_fd, (void *)(VkSemaphore)dst_sem->s,
                                ctx->binary_semaphore_idx);
 
-                // Verify fd is valid before import
+                // Count open fds to detect leaks
 #if !defined(_WIN32)
                 {
-                    int fd_flags = fcntl(sync_fd, F_GETFL);
-                    GGML_LOG_DEBUG("ggml_vulkan: pre-import fd check: fd=%d fcntl(F_GETFL)=%d errno=%d\n",
-                                   sync_fd, fd_flags, fd_flags == -1 ? errno : 0);
-
-                    // Read /proc/self/fdinfo to identify the fd type
-                    char fdinfo_path[64];
-                    snprintf(fdinfo_path, sizeof(fdinfo_path), "/proc/self/fdinfo/%d", sync_fd);
-                    FILE * f = fopen(fdinfo_path, "r");
-                    if (f) {
-                        int line_count = 0;
-                        char line[256];
-                        while (fgets(line, sizeof(line), f)) {
-                            size_t len = strlen(line);
-                            if (len > 0 && line[len-1] == '\n') line[len-1] = '\0';
-                            GGML_LOG_DEBUG("ggml_vulkan: fdinfo: %s\n", line);
-                            line_count++;
-                        }
-                        if (line_count == 0) {
-                            GGML_LOG_WARN("ggml_vulkan: fdinfo: file was empty for fd=%d\n", sync_fd);
-                        }
-                        fclose(f);
-                    } else {
-                        GGML_LOG_WARN("ggml_vulkan: fdinfo: failed to open %s (errno=%d)\n",
-                                      fdinfo_path, errno);
+                    int fd_count = 0;
+                    DIR * d = opendir("/proc/self/fd");
+                    if (d) {
+                        while (readdir(d)) { fd_count++; }
+                        closedir(d);
+                        fd_count -= 3; // subtract ., .., and the dirfd itself
                     }
-
-                    // Also check via readlink what type of fd this is
-                    char fd_link_path[64], fd_target[256];
-                    snprintf(fd_link_path, sizeof(fd_link_path), "/proc/self/fd/%d", sync_fd);
-                    ssize_t link_len = readlink(fd_link_path, fd_target, sizeof(fd_target) - 1);
-                    if (link_len > 0) {
-                        fd_target[link_len] = '\0';
-                        GGML_LOG_DEBUG("ggml_vulkan: fd %d -> %s\n", sync_fd, fd_target);
-                    }
+                    GGML_LOG_DEBUG("ggml_vulkan: pre-import: sync_fd=%d open_fds=%d\n",
+                                   sync_fd, fd_count);
                 }
 #endif
 
