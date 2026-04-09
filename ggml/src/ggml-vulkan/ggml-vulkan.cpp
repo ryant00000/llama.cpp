@@ -13404,14 +13404,31 @@ static void ggml_vk_graph_cleanup(ggml_backend_vk_context * ctx) {
         ggml_vk_queue_command_pools_cleanup(ctx->device);
     }
 
-    GGML_LOG_DEBUG("ggml_vulkan: graph_cleanup(%s) binary_semaphore_idx=%zu\n",
-                   ctx->name.c_str(), ctx->binary_semaphore_idx);
-    // Destroy binary semaphores rather than pooling — drivers may hold
-    // imported sync_fd handles until the semaphore is destroyed.
+    GGML_LOG_DEBUG("ggml_vulkan: graph_cleanup(%s) binary_semaphore_idx=%zu gc.semaphores=%zu\n",
+                   ctx->name.c_str(), ctx->binary_semaphore_idx, ctx->gc.semaphores.size());
+#if !defined(_WIN32)
+    if (!ctx->gc.semaphores.empty()) {
+        auto count_fds = []() -> int {
+            int n = 0;
+            DIR * d = opendir("/proc/self/fd");
+            if (d) { while (readdir(d)) n++; closedir(d); n -= 3; }
+            return n;
+        };
+        int fds_before = count_fds();
+        for (size_t i = 0; i < ctx->gc.semaphores.size(); i++) {
+            ctx->device->device.destroySemaphore(ctx->gc.semaphores[i].s);
+        }
+        int fds_after = count_fds();
+        GGML_LOG_DEBUG("ggml_vulkan: graph_cleanup destroyed %zu binary sems: fds %d -> %d (delta=%d)\n",
+                       ctx->gc.semaphores.size(), fds_before, fds_after, fds_after - fds_before);
+        ctx->gc.semaphores.clear();
+    }
+#else
     for (size_t i = 0; i < ctx->gc.semaphores.size(); i++) {
         ctx->device->device.destroySemaphore(ctx->gc.semaphores[i].s);
     }
     ctx->gc.semaphores.clear();
+#endif
     ctx->binary_semaphore_idx = 0;
 
     for (auto& [peer, staging] : ctx->device->peer_staging) {
