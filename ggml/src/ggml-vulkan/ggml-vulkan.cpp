@@ -13903,16 +13903,23 @@ static vk_peer_copy_buf * ggml_vk_get_peer_copy_buf(vk_device& src_dev, vk_devic
         bool use_sync_fd = src_dev->external_semaphore_sync_fd && dst_dev->external_semaphore_sync_fd;
         staging.use_sync_fd = use_sync_fd;
 
+        GGML_LOG_DEBUG("ggml_vulkan: peer_staging init: src=%s dst=%s use_sync_fd=%d\n",
+                       src_dev->name.c_str(), dst_dev->name.c_str(), (int)use_sync_fd);
+
         if (use_sync_fd) {
             vk::ExportSemaphoreCreateInfo export_ci{ vk::ExternalSemaphoreHandleTypeFlagBits::eSyncFd };
             vk::SemaphoreCreateInfo sci{};
             sci.setPNext(&export_ci);
             staging.src_sem = src_dev->device.createSemaphore(sci);
+            GGML_LOG_DEBUG("ggml_vulkan: created exportable src_sem=%p on %s\n",
+                           (void *)(VkSemaphore)staging.src_sem, src_dev->name.c_str());
         } else {
             vk::SemaphoreTypeCreateInfo tci{ vk::SemaphoreType::eTimeline, 0 };
             vk::SemaphoreCreateInfo sci{};
             sci.setPNext(&tci);
             staging.tl_sem = src_dev->device.createSemaphore(sci);
+            GGML_LOG_DEBUG("ggml_vulkan: created timeline tl_sem=%p on %s\n",
+                           (void *)(VkSemaphore)staging.tl_sem, src_dev->name.c_str());
         }
     }
 
@@ -13971,12 +13978,18 @@ static bool ggml_backend_vk_cpy_tensor_async(ggml_backend_t backend_src, ggml_ba
             size_t src_offset = vk_tensor_offset(src) + src->view_offs;
             size_t dst_offset = vk_tensor_offset(dst) + dst->view_offs;
 
+            GGML_LOG_DEBUG("ggml_vulkan: cross-device copy %s -> %s, nbytes=%zu\n",
+                           src_dev->name.c_str(), dst_dev->name.c_str(), nbytes);
+
             vk_peer_copy_buf * copy_buf = ggml_vk_get_peer_copy_buf(src_dev, dst_dev, nbytes);
             if (!copy_buf) {
+                GGML_LOG_DEBUG("ggml_vulkan: cross-device copy: failed to get peer copy buf\n");
                 return false;
             }
 
             auto& staging = src_dev->peer_staging[dst_dev.get()];
+            GGML_LOG_DEBUG("ggml_vulkan: cross-device copy: buf_idx=%zu/%zu use_sync_fd=%d\n",
+                           staging.buf_idx, staging.bufs.size(), (int)staging.use_sync_fd);
 
             // HOP 1: src VRAM → staging (on source compute queue)
             // Implicit queue submission ordering guarantees this
@@ -14012,8 +14025,19 @@ static bool ggml_backend_vk_cpy_tensor_async(ggml_backend_t backend_src, ggml_ba
                 };
                 int sync_fd = src_dev->device.getSemaphoreFdKHR(get_fd_info);
 
+                GGML_LOG_DEBUG("ggml_vulkan: cross-device sync_fd: src_dev=%s dst_dev=%s "
+                               "nbytes=%zu sync_fd=%d src_sem=%p dst_compute_ctx=%p\n",
+                               src_dev->name.c_str(), dst_dev->name.c_str(),
+                               nbytes, sync_fd, (void *)(VkSemaphore)staging.src_sem,
+                               (void *)dst_compute_ctx.get());
+
                 // Per-copy dest semaphore (temporary import is consumed per wait)
                 vk_semaphore * dst_sem = ggml_vk_create_binary_semaphore(ctx);
+
+                GGML_LOG_DEBUG("ggml_vulkan: cross-device importing sync_fd=%d into dst_sem=%p "
+                               "(binary_semaphore_idx=%zu)\n",
+                               sync_fd, (void *)(VkSemaphore)dst_sem->s,
+                               ctx->binary_semaphore_idx);
 
                 vk::ImportSemaphoreFdInfoKHR import_info{
                     dst_sem->s,
@@ -14022,6 +14046,8 @@ static bool ggml_backend_vk_cpy_tensor_async(ggml_backend_t backend_src, ggml_ba
                     sync_fd
                 };
                 dst_dev->device.importSemaphoreFdKHR(import_info);
+
+                GGML_LOG_DEBUG("ggml_vulkan: cross-device import succeeded\n");
 
                 dst_compute_ctx->s->wait_semaphores.push_back({ dst_sem->s, 0 });
             } else {
