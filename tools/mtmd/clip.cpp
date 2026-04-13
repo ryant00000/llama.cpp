@@ -515,7 +515,7 @@ ggml_tensor * clip_graph::build_inp() {
 }
 
 ggml_tensor * clip_graph::build_inp_raw(int channels) {
-    ggml_tensor * inp_raw = ggml_new_tensor_3d(ctx0, GGML_TYPE_F32, img.nx, img.ny, channels);
+    ggml_tensor * inp_raw = ggml_new_tensor_4d(ctx0, GGML_TYPE_F32, img.nx, img.ny, channels, nt);
     ggml_set_name(inp_raw, "inp_raw");
     ggml_set_input(inp_raw);
     return inp_raw;
@@ -950,6 +950,9 @@ static ggml_cgraph * clip_image_build_graph(clip_ctx * ctx, const clip_image_f32
         default:
             GGML_ABORT("missing cgraph builder");
     }
+
+    // TODO [QWEN_VIDEO]: improve this in the future
+    builder->nt = imgs.entries.size();
 
     return builder->build();
 }
@@ -3042,10 +3045,11 @@ bool clip_image_encode(struct clip_ctx * ctx, const int n_threads, clip_image_f3
 bool clip_image_batch_encode(clip_ctx * ctx, const int n_threads, const clip_image_f32_batch * imgs_c_ptr, float * vec) {
     const clip_image_f32_batch & imgs = *imgs_c_ptr;
     int batch_size = imgs.entries.size();
+    bool support_seq = clip_model_supports_seq_input(ctx);
 
     // TODO @ngxson : implement batch size > 1 as a loop
     //                we don't need true batching support because the cgraph will gonna be big anyway
-    if (batch_size != 1) {
+    if (batch_size != 1 && !support_seq) {
         return false; // only support batch size of 1
     }
 
@@ -3100,17 +3104,9 @@ bool clip_image_batch_encode(clip_ctx * ctx, const int n_threads, const clip_ima
 
     // set input pixel values
     if (!imgs.is_audio) {
-        // detect number of channels from the buffer size
-        const int nx = imgs.entries[0]->nx;
-        const int ny = imgs.entries[0]->ny;
-        const int n  = nx * ny;
-        const size_t buf_size = imgs.entries[0]->buf.size();
-        const int n_channels = (int)(buf_size / n);
-        GGML_ASSERT(n_channels == 3 || n_channels == 6);
-
         size_t nelem = 0;
         for (const auto & img : imgs.entries) {
-            nelem += img->nx * img->ny * n_channels;
+            nelem += img->nx * img->ny * 3;
         }
         std::vector<float> inp_raw(nelem);
 
@@ -3124,21 +3120,23 @@ bool clip_image_batch_encode(clip_ctx * ctx, const int n_threads, const clip_ima
         // │     H │  channel = B
         // └─────┘ │
         //   ──────┘ x B
-        //
-        // for 6-channel video input, same layout but with 6 planar channels
 
-        for (int b = 0; b < batch_size; b++) {
-            const int cur_nx = imgs.entries[b]->nx;
-            const int cur_ny = imgs.entries[b]->ny;
-            const int cur_n  = cur_nx * cur_ny;
+        // IMPORTANT: [QWEN_VIDEO] the batch dim is currently used for temporal dim in Qwen-VL models
 
-            float * batch_entry = inp_raw.data() + b * (n_channels * cur_n);
-            for (int y = 0; y < cur_ny; y++) {
-                for (int x = 0; x < cur_nx; x++) {
-                    size_t base_src = n_channels * (y * cur_nx + x);
-                    size_t base_dst =              y * cur_nx + x;
-                    for (int c = 0; c < n_channels; c++) {
-                        batch_entry[c * cur_n + base_dst] = imgs.entries[b]->buf[base_src + c];
+        for (size_t i = 0; i < imgs.entries.size(); i++) {
+            const int nx = imgs.entries[i]->nx;
+            const int ny = imgs.entries[i]->ny;
+            const int n = nx * ny;
+
+            for (int b = 0; b < batch_size; b++) {
+                float * batch_entry = inp_raw.data() + b * (3*n);
+                for (int y = 0; y < ny; y++) {
+                    for (int x = 0; x < nx; x++) {
+                        size_t base_src = 3*(y * nx + x); // idx of the first channel
+                        size_t base_dst =    y * nx + x;  // idx of the first channel
+                        batch_entry[      base_dst] = imgs.entries[b]->buf[base_src    ];
+                        batch_entry[1*n + base_dst] = imgs.entries[b]->buf[base_src + 1];
+                        batch_entry[2*n + base_dst] = imgs.entries[b]->buf[base_src + 2];
                     }
                 }
             }
@@ -3749,6 +3747,17 @@ bool clip_has_whisper_encoder(const struct clip_ctx * ctx) {
         case PROJECTOR_TYPE_VOXTRAL:
         case PROJECTOR_TYPE_MERALION:
         case PROJECTOR_TYPE_MUSIC_FLAMINGO:
+            return true;
+        default:
+            return false;
+    }
+}
+
+bool clip_model_supports_seq_input(const struct clip_ctx * ctx) {
+    switch (ctx->proj_type()) {
+        case PROJECTOR_TYPE_QWEN2VL:
+        case PROJECTOR_TYPE_QWEN25VL:
+        case PROJECTOR_TYPE_QWEN3VL:
             return true;
         default:
             return false;
