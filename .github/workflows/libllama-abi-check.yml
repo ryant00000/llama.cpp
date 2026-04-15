@@ -1,8 +1,16 @@
 name: libllama ABI check
 
-# Checks exported symbols of libllama against a committed baseline and
-# determines whether a major (symbols removed/changed) or minor (symbols
-# added) version bump is required.
+# Checks exported function signatures of libllama against a committed baseline
+# (scripts/libllama.abi) and determines whether a major (signatures
+# removed/changed) or minor (signatures added) version bump is required.
+#
+# The baseline is generated from include/llama.h by scripts/gen-libllama-abi.py.
+# To update the baseline after an intentional ABI change:
+#
+#   python3 scripts/gen-libllama-abi.py include/llama.h > scripts/libllama.abi
+#
+# Then increment LLAMA_VERSION_MAJOR (breaking change) or LLAMA_VERSION_MINOR
+# (backwards-compatible addition) in CMakeLists.txt.
 
 on:
   workflow_dispatch:
@@ -11,9 +19,8 @@ on:
       - master
     paths:
       - 'include/llama.h'
-      - 'include/llama-cpp.h'
-      - 'src/**'
       - 'scripts/libllama.abi'
+      - 'scripts/gen-libllama-abi.py'
       - 'CMakeLists.txt'
       - '.github/workflows/libllama-abi-check.yml'
 
@@ -21,9 +28,8 @@ on:
     types: [opened, synchronize, reopened]
     paths:
       - 'include/llama.h'
-      - 'include/llama-cpp.h'
-      - 'src/**'
       - 'scripts/libllama.abi'
+      - 'scripts/gen-libllama-abi.py'
       - 'CMakeLists.txt'
       - '.github/workflows/libllama-abi-check.yml'
 
@@ -41,26 +47,9 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v6
 
-      - name: Configure
+      - name: Extract current signatures
         run: |
-          cmake -B build \
-            -DBUILD_SHARED_LIBS=ON \
-            -DLLAMA_BUILD_TESTS=OFF \
-            -DLLAMA_BUILD_EXAMPLES=OFF \
-            -DLLAMA_TOOLS_INSTALL=OFF \
-            -DGGML_METAL=OFF \
-            -DGGML_CUDA=OFF \
-            -DCMAKE_BUILD_TYPE=Release
-
-      - name: Build libllama
-        run: cmake --build build --target llama -j$(nproc)
-
-      - name: Extract exported symbols
-        run: |
-          nm -D --format=posix build/bin/libllama.so \
-            | awk '$2 == "T" || $2 == "W" {print $1}' \
-            | grep '^llama_' \
-            | sort > /tmp/current.abi
+          python3 scripts/gen-libllama-abi.py include/llama.h > /tmp/current.abi
 
       - name: Compare with baseline
         id: compare
@@ -75,7 +64,7 @@ jobs:
             echo "bump=major" >> "$GITHUB_OUTPUT"
             echo "### :boom: MAJOR version bump required" >> "$GITHUB_STEP_SUMMARY"
             echo "" >> "$GITHUB_STEP_SUMMARY"
-            echo "The following exported symbols were **removed** from libllama:" >> "$GITHUB_STEP_SUMMARY"
+            echo "The following exported signatures were **removed or changed** in libllama:" >> "$GITHUB_STEP_SUMMARY"
             echo '```' >> "$GITHUB_STEP_SUMMARY"
             echo "$removed" >> "$GITHUB_STEP_SUMMARY"
             echo '```' >> "$GITHUB_STEP_SUMMARY"
@@ -83,7 +72,7 @@ jobs:
             echo "bump=minor" >> "$GITHUB_OUTPUT"
             echo "### :sparkles: MINOR version bump required" >> "$GITHUB_STEP_SUMMARY"
             echo "" >> "$GITHUB_STEP_SUMMARY"
-            echo "The following new symbols were **added** to libllama:" >> "$GITHUB_STEP_SUMMARY"
+            echo "The following new signatures were **added** to libllama:" >> "$GITHUB_STEP_SUMMARY"
             echo '```' >> "$GITHUB_STEP_SUMMARY"
             echo "$added" >> "$GITHUB_STEP_SUMMARY"
             echo '```' >> "$GITHUB_STEP_SUMMARY"
@@ -94,11 +83,17 @@ jobs:
 
           if [ -n "$removed" ] || [ -n "$added" ]; then
             echo "" >> "$GITHUB_STEP_SUMMARY"
-            echo "Update \`scripts/libllama.abi\` and increment \`LLAMA_VERSION_MAJOR\`/\`LLAMA_VERSION_MINOR\` in \`CMakeLists.txt\` accordingly." >> "$GITHUB_STEP_SUMMARY"
+            echo "Regenerate the baseline and bump the version:" >> "$GITHUB_STEP_SUMMARY"
+            echo '```' >> "$GITHUB_STEP_SUMMARY"
+            echo "python3 scripts/gen-libllama-abi.py include/llama.h > scripts/libllama.abi" >> "$GITHUB_STEP_SUMMARY"
+            echo '```' >> "$GITHUB_STEP_SUMMARY"
+            echo "Then increment \`LLAMA_VERSION_MAJOR\` (breaking) or \`LLAMA_VERSION_MINOR\` (additive) in \`CMakeLists.txt\`." >> "$GITHUB_STEP_SUMMARY"
           fi
 
-      - name: Fail on unacknowledged ABI break
+      - name: Fail on unacknowledged ABI change
         if: steps.compare.outputs.bump == 'major' || steps.compare.outputs.bump == 'minor'
         run: |
-          echo "ABI change detected. Update scripts/libllama.abi and bump LLAMA_VERSION_MAJOR/LLAMA_VERSION_MINOR in CMakeLists.txt."
+          echo "ABI change detected. Run: python3 scripts/gen-libllama-abi.py include/llama.h > scripts/libllama.abi"
+          echo "Then bump LLAMA_VERSION_MAJOR (breaking) or LLAMA_VERSION_MINOR (additive) in CMakeLists.txt."
           exit 1
+

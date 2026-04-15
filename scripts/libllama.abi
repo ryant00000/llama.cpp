@@ -1,233 +1,233 @@
-llama_adapter_get_alora_invocation_tokens
-llama_adapter_get_alora_n_invocation_tokens
-llama_adapter_lora_free
-llama_adapter_lora_init
-llama_adapter_meta_count
-llama_adapter_meta_key_by_index
-llama_adapter_meta_val_str
-llama_adapter_meta_val_str_by_index
-llama_add_bos_token
-llama_add_eos_token
-llama_attach_threadpool
-llama_backend_free
-llama_backend_init
-llama_batch_free
-llama_batch_get_one
-llama_batch_init
-llama_chat_apply_template
-llama_chat_builtin_templates
-llama_context_default_params
-llama_copy_state_data
-llama_decode
-llama_detach_threadpool
-llama_detokenize
-llama_encode
-llama_flash_attn_type_name
-llama_free
-llama_free_model
-llama_get_embeddings
-llama_get_embeddings_ith
-llama_get_embeddings_seq
-llama_get_logits
-llama_get_logits_ith
-llama_get_memory
-llama_get_model
-llama_get_sampled_candidates_count_ith
-llama_get_sampled_candidates_ith
-llama_get_sampled_logits_count_ith
-llama_get_sampled_logits_ith
-llama_get_sampled_probs_count_ith
-llama_get_sampled_probs_ith
-llama_get_sampled_token_ith
-llama_get_state_size
-llama_init_from_model
-llama_load_model_from_file
-llama_load_session_file
-llama_log_get
-llama_log_set
-llama_max_devices
-llama_max_parallel_sequences
-llama_max_tensor_buft_overrides
-llama_memory_breakdown_print
-llama_memory_can_shift
-llama_memory_clear
-llama_memory_seq_add
-llama_memory_seq_cp
-llama_memory_seq_div
-llama_memory_seq_keep
-llama_memory_seq_pos_max
-llama_memory_seq_pos_min
-llama_memory_seq_rm
-llama_model_chat_template
-llama_model_cls_label
-llama_model_decoder_start_token
-llama_model_default_params
-llama_model_desc
-llama_model_free
-llama_model_get_vocab
-llama_model_has_decoder
-llama_model_has_encoder
-llama_model_init_from_user
-llama_model_is_diffusion
-llama_model_is_hybrid
-llama_model_is_recurrent
-llama_model_load_from_file
-llama_model_load_from_file_ptr
-llama_model_load_from_splits
-llama_model_meta_count
-llama_model_meta_key_by_index
-llama_model_meta_key_str
-llama_model_meta_val_str
-llama_model_meta_val_str_by_index
-llama_model_n_cls_out
-llama_model_n_ctx_train
-llama_model_n_embd
-llama_model_n_embd_inp
-llama_model_n_embd_out
-llama_model_n_head
-llama_model_n_head_kv
-llama_model_n_layer
-llama_model_n_params
-llama_model_n_swa
-llama_model_quantize
-llama_model_quantize_default_params
-llama_model_rope_freq_scale_train
-llama_model_rope_type
-llama_model_save_to_file
-llama_model_size
-llama_n_batch
-llama_n_ctx
-llama_n_ctx_seq
-llama_n_ctx_train
-llama_n_embd
-llama_n_head
-llama_n_layer
-llama_n_seq_max
-llama_n_threads
-llama_n_threads_batch
-llama_n_ubatch
-llama_n_vocab
-llama_new_context_with_model
-llama_numa_init
-llama_opt_epoch
-llama_opt_init
-llama_opt_param_filter_all
-llama_params_fit
-llama_perf_context
-llama_perf_context_print
-llama_perf_context_reset
-llama_perf_sampler
-llama_perf_sampler_print
-llama_perf_sampler_reset
-llama_pooling_type
-llama_print_system_info
-llama_sampler_accept
-llama_sampler_apply
-llama_sampler_chain_add
-llama_sampler_chain_default_params
-llama_sampler_chain_get
-llama_sampler_chain_init
-llama_sampler_chain_n
-llama_sampler_chain_remove
-llama_sampler_clone
-llama_sampler_free
-llama_sampler_get_seed
-llama_sampler_init
-llama_sampler_init_adaptive_p
-llama_sampler_init_dist
-llama_sampler_init_dry
-llama_sampler_init_grammar
-llama_sampler_init_grammar_lazy
-llama_sampler_init_grammar_lazy_patterns
-llama_sampler_init_greedy
-llama_sampler_init_infill
-llama_sampler_init_logit_bias
-llama_sampler_init_min_p
-llama_sampler_init_mirostat
-llama_sampler_init_mirostat_v2
-llama_sampler_init_penalties
-llama_sampler_init_temp
-llama_sampler_init_temp_ext
-llama_sampler_init_top_k
-llama_sampler_init_top_n_sigma
-llama_sampler_init_top_p
-llama_sampler_init_typical
-llama_sampler_init_xtc
-llama_sampler_name
-llama_sampler_reset
-llama_sampler_sample
-llama_save_session_file
-llama_set_abort_callback
-llama_set_adapter_cvec
-llama_set_adapters_lora
-llama_set_causal_attn
-llama_set_embeddings
-llama_set_n_threads
-llama_set_sampler
-llama_set_state_data
-llama_set_warmup
-llama_split_path
-llama_split_prefix
-llama_state_get_data
-llama_state_get_size
-llama_state_load_file
-llama_state_save_file
-llama_state_seq_get_data
-llama_state_seq_get_data_ext
-llama_state_seq_get_size
-llama_state_seq_get_size_ext
-llama_state_seq_load_file
-llama_state_seq_save_file
-llama_state_seq_set_data
-llama_state_seq_set_data_ext
-llama_state_set_data
-llama_supports_gpu_offload
-llama_supports_mlock
-llama_supports_mmap
-llama_supports_rpc
-llama_synchronize
-llama_time_us
-llama_token_bos
-llama_token_cls
-llama_token_eos
-llama_token_eot
-llama_token_fim_mid
-llama_token_fim_pad
-llama_token_fim_pre
-llama_token_fim_rep
-llama_token_fim_sep
-llama_token_fim_suf
-llama_token_get_attr
-llama_token_get_score
-llama_token_get_text
-llama_token_is_control
-llama_token_is_eog
-llama_token_nl
-llama_token_pad
-llama_token_sep
-llama_token_to_piece
-llama_tokenize
-llama_vocab_bos
-llama_vocab_cls
-llama_vocab_eos
-llama_vocab_eot
-llama_vocab_fim_mid
-llama_vocab_fim_pad
-llama_vocab_fim_pre
-llama_vocab_fim_rep
-llama_vocab_fim_sep
-llama_vocab_fim_suf
-llama_vocab_get_add_bos
-llama_vocab_get_add_eos
-llama_vocab_get_add_sep
-llama_vocab_get_attr
-llama_vocab_get_score
-llama_vocab_get_text
-llama_vocab_is_control
-llama_vocab_is_eog
-llama_vocab_mask
-llama_vocab_n_tokens
-llama_vocab_nl
-llama_vocab_pad
-llama_vocab_sep
-llama_vocab_type
+const llama_token * llama_adapter_get_alora_invocation_tokens (const struct llama_adapter_lora * adapter)
+uint64_t llama_adapter_get_alora_n_invocation_tokens(const struct llama_adapter_lora * adapter)
+void llama_adapter_lora_free(struct llama_adapter_lora * adapter)
+struct llama_adapter_lora * llama_adapter_lora_init( struct llama_model * model, const char * path_lora)
+int32_t llama_adapter_meta_count(const struct llama_adapter_lora * adapter)
+int32_t llama_adapter_meta_key_by_index(const struct llama_adapter_lora * adapter, int32_t i, char * buf, size_t buf_size)
+int32_t llama_adapter_meta_val_str(const struct llama_adapter_lora * adapter, const char * key, char * buf, size_t buf_size)
+int32_t llama_adapter_meta_val_str_by_index(const struct llama_adapter_lora * adapter, int32_t i, char * buf, size_t buf_size)
+bool llama_add_bos_token(const struct llama_vocab * vocab)
+bool llama_add_eos_token(const struct llama_vocab * vocab)
+void llama_attach_threadpool( struct llama_context * ctx, ggml_threadpool_t threadpool, ggml_threadpool_t threadpool_batch)
+void llama_backend_free(void)
+void llama_backend_init(void)
+void llama_batch_free(struct llama_batch batch)
+struct llama_batch llama_batch_get_one( llama_token * tokens, int32_t n_tokens)
+struct llama_batch llama_batch_init( int32_t n_tokens, int32_t embd, int32_t n_seq_max)
+int32_t llama_chat_apply_template( const char * tmpl, const struct llama_chat_message * chat, size_t n_msg, bool add_ass, char * buf, int32_t length)
+int32_t llama_chat_builtin_templates(const char ** output, size_t len)
+struct llama_context_params llama_context_default_params(void)
+size_t llama_copy_state_data( struct llama_context * ctx, uint8_t * dst)
+int32_t llama_decode( struct llama_context * ctx, struct llama_batch batch)
+void llama_detach_threadpool(struct llama_context * ctx)
+int32_t llama_detokenize( const struct llama_vocab * vocab, const llama_token * tokens, int32_t n_tokens, char * text, int32_t text_len_max, bool remove_special, bool unparse_special)
+int32_t llama_encode( struct llama_context * ctx, struct llama_batch batch)
+const char * llama_flash_attn_type_name(enum llama_flash_attn_type flash_attn_type)
+void llama_free(struct llama_context * ctx)
+void llama_free_model(struct llama_model * model)
+float * llama_get_embeddings(struct llama_context * ctx)
+float * llama_get_embeddings_ith(struct llama_context * ctx, int32_t i)
+float * llama_get_embeddings_seq(struct llama_context * ctx, llama_seq_id seq_id)
+float * llama_get_logits(struct llama_context * ctx)
+float * llama_get_logits_ith(struct llama_context * ctx, int32_t i)
+llama_memory_t llama_get_memory (const struct llama_context * ctx)
+const struct llama_model * llama_get_model (const struct llama_context * ctx)
+uint32_t llama_get_sampled_candidates_count_ith(struct llama_context * ctx, int32_t i)
+llama_token * llama_get_sampled_candidates_ith (struct llama_context * ctx, int32_t i)
+uint32_t llama_get_sampled_logits_count_ith(struct llama_context * ctx, int32_t i)
+float * llama_get_sampled_logits_ith (struct llama_context * ctx, int32_t i)
+uint32_t llama_get_sampled_probs_count_ith(struct llama_context * ctx, int32_t i)
+float * llama_get_sampled_probs_ith (struct llama_context * ctx, int32_t i)
+llama_token llama_get_sampled_token_ith(struct llama_context * ctx, int32_t i)
+size_t llama_get_state_size(struct llama_context * ctx)
+struct llama_context * llama_init_from_model( struct llama_model * model, struct llama_context_params params)
+struct llama_model * llama_load_model_from_file( const char * path_model, struct llama_model_params params)
+bool llama_load_session_file( struct llama_context * ctx, const char * path_session, llama_token * tokens_out, size_t n_token_capacity, size_t * n_token_count_out)
+void llama_log_get(ggml_log_callback * log_callback, void ** user_data)
+void llama_log_set(ggml_log_callback log_callback, void * user_data)
+size_t llama_max_devices(void)
+size_t llama_max_parallel_sequences(void)
+size_t llama_max_tensor_buft_overrides(void)
+void llama_memory_breakdown_print(const struct llama_context * ctx)
+bool llama_memory_can_shift(llama_memory_t mem)
+void llama_memory_clear( llama_memory_t mem, bool data)
+void llama_memory_seq_add( llama_memory_t mem, llama_seq_id seq_id, llama_pos p0, llama_pos p1, llama_pos delta)
+void llama_memory_seq_cp( llama_memory_t mem, llama_seq_id seq_id_src, llama_seq_id seq_id_dst, llama_pos p0, llama_pos p1)
+void llama_memory_seq_div( llama_memory_t mem, llama_seq_id seq_id, llama_pos p0, llama_pos p1, int d)
+void llama_memory_seq_keep( llama_memory_t mem, llama_seq_id seq_id)
+llama_pos llama_memory_seq_pos_max( llama_memory_t mem, llama_seq_id seq_id)
+llama_pos llama_memory_seq_pos_min( llama_memory_t mem, llama_seq_id seq_id)
+bool llama_memory_seq_rm( llama_memory_t mem, llama_seq_id seq_id, llama_pos p0, llama_pos p1)
+const char * llama_model_chat_template(const struct llama_model * model, const char * name)
+const char * llama_model_cls_label(const struct llama_model * model, uint32_t i)
+llama_token llama_model_decoder_start_token(const struct llama_model * model)
+struct llama_model_params llama_model_default_params(void)
+int32_t llama_model_desc(const struct llama_model * model, char * buf, size_t buf_size)
+void llama_model_free(struct llama_model * model)
+const struct llama_vocab * llama_model_get_vocab(const struct llama_model * model)
+bool llama_model_has_decoder(const struct llama_model * model)
+bool llama_model_has_encoder(const struct llama_model * model)
+struct llama_model * llama_model_init_from_user( struct gguf_context * metadata, llama_model_set_tensor_data_t set_tensor_data, void * set_tensor_data_ud, struct llama_model_params params)
+bool llama_model_is_diffusion(const struct llama_model * model)
+bool llama_model_is_hybrid(const struct llama_model * model)
+bool llama_model_is_recurrent(const struct llama_model * model)
+struct llama_model * llama_model_load_from_file( const char * path_model, struct llama_model_params params)
+struct llama_model * llama_model_load_from_file_ptr( FILE * file, struct llama_model_params params)
+struct llama_model * llama_model_load_from_splits( const char ** paths, size_t n_paths, struct llama_model_params params)
+int32_t llama_model_meta_count(const struct llama_model * model)
+int32_t llama_model_meta_key_by_index(const struct llama_model * model, int32_t i, char * buf, size_t buf_size)
+const char * llama_model_meta_key_str(enum llama_model_meta_key key)
+int32_t llama_model_meta_val_str(const struct llama_model * model, const char * key, char * buf, size_t buf_size)
+int32_t llama_model_meta_val_str_by_index(const struct llama_model * model, int32_t i, char * buf, size_t buf_size)
+uint32_t llama_model_n_cls_out(const struct llama_model * model)
+int32_t llama_model_n_ctx_train(const struct llama_model * model)
+int32_t llama_model_n_embd (const struct llama_model * model)
+int32_t llama_model_n_embd_inp (const struct llama_model * model)
+int32_t llama_model_n_embd_out (const struct llama_model * model)
+int32_t llama_model_n_head (const struct llama_model * model)
+int32_t llama_model_n_head_kv (const struct llama_model * model)
+int32_t llama_model_n_layer (const struct llama_model * model)
+uint64_t llama_model_n_params(const struct llama_model * model)
+int32_t llama_model_n_swa (const struct llama_model * model)
+uint32_t llama_model_quantize( const char * fname_inp, const char * fname_out, const llama_model_quantize_params * params)
+struct llama_model_quantize_params llama_model_quantize_default_params(void)
+float llama_model_rope_freq_scale_train(const struct llama_model * model)
+enum llama_rope_type llama_model_rope_type(const struct llama_model * model)
+void llama_model_save_to_file( const struct llama_model * model, const char * path_model)
+uint64_t llama_model_size(const struct llama_model * model)
+uint32_t llama_n_batch (const struct llama_context * ctx)
+uint32_t llama_n_ctx (const struct llama_context * ctx)
+uint32_t llama_n_ctx_seq (const struct llama_context * ctx)
+int32_t llama_n_ctx_train(const struct llama_model * model)
+int32_t llama_n_embd (const struct llama_model * model)
+int32_t llama_n_head (const struct llama_model * model)
+int32_t llama_n_layer (const struct llama_model * model)
+uint32_t llama_n_seq_max (const struct llama_context * ctx)
+int32_t llama_n_threads(struct llama_context * ctx)
+int32_t llama_n_threads_batch(struct llama_context * ctx)
+uint32_t llama_n_ubatch (const struct llama_context * ctx)
+int32_t llama_n_vocab (const struct llama_vocab * vocab)
+struct llama_context * llama_new_context_with_model( struct llama_model * model, struct llama_context_params params)
+void llama_numa_init(enum ggml_numa_strategy numa)
+void llama_opt_epoch( struct llama_context * lctx, ggml_opt_dataset_t dataset, ggml_opt_result_t result_train, ggml_opt_result_t result_eval, int64_t idata_split, ggml_opt_epoch_callback callback_train, ggml_opt_epoch_callback callback_eval)
+void llama_opt_init(struct llama_context * lctx, struct llama_model * model, struct llama_opt_params lopt_params)
+bool llama_opt_param_filter_all(const struct ggml_tensor * tensor, void * userdata)
+enum llama_params_fit_status llama_params_fit( const char * path_model, struct llama_model_params * mparams, struct llama_context_params * cparams, float * tensor_split, struct llama_model_tensor_buft_override * tensor_buft_overrides, size_t * margins, uint32_t n_ctx_min, enum ggml_log_level log_level)
+struct llama_perf_context_data llama_perf_context (const struct llama_context * ctx)
+void llama_perf_context_print(const struct llama_context * ctx)
+void llama_perf_context_reset( struct llama_context * ctx)
+struct llama_perf_sampler_data llama_perf_sampler (const struct llama_sampler * chain)
+void llama_perf_sampler_print(const struct llama_sampler * chain)
+void llama_perf_sampler_reset( struct llama_sampler * chain)
+enum llama_pooling_type llama_pooling_type(const struct llama_context * ctx)
+const char * llama_print_system_info(void)
+void llama_sampler_accept( struct llama_sampler * smpl, llama_token token)
+void llama_sampler_apply ( struct llama_sampler * smpl, llama_token_data_array * cur_p)
+void llama_sampler_chain_add( struct llama_sampler * chain, struct llama_sampler * smpl)
+struct llama_sampler_chain_params llama_sampler_chain_default_params(void)
+struct llama_sampler * llama_sampler_chain_get( struct llama_sampler * chain, int32_t i)
+struct llama_sampler * llama_sampler_chain_init(struct llama_sampler_chain_params params)
+int llama_sampler_chain_n (const struct llama_sampler * chain)
+struct llama_sampler * llama_sampler_chain_remove( struct llama_sampler * chain, int32_t i)
+struct llama_sampler * llama_sampler_clone (const struct llama_sampler * smpl)
+void llama_sampler_free ( struct llama_sampler * smpl)
+uint32_t llama_sampler_get_seed(const struct llama_sampler * smpl)
+struct llama_sampler * llama_sampler_init ( struct llama_sampler_i * iface, llama_sampler_context_t ctx)
+struct llama_sampler * llama_sampler_init_adaptive_p( float target, float decay, uint32_t seed)
+struct llama_sampler * llama_sampler_init_dist(uint32_t seed)
+struct llama_sampler * llama_sampler_init_dry( const struct llama_vocab * vocab, int32_t n_ctx_train, float dry_multiplier, float dry_base, int32_t dry_allowed_length, int32_t dry_penalty_last_n, const char ** seq_breakers, size_t num_breakers)
+struct llama_sampler * llama_sampler_init_grammar( const struct llama_vocab * vocab, const char * grammar_str, const char * grammar_root)
+struct llama_sampler * llama_sampler_init_grammar_lazy( const struct llama_vocab * vocab, const char * grammar_str, const char * grammar_root, const char ** trigger_words, size_t num_trigger_words, const llama_token * trigger_tokens, size_t num_trigger_tokens)
+struct llama_sampler * llama_sampler_init_grammar_lazy_patterns( const struct llama_vocab * vocab, const char * grammar_str, const char * grammar_root, const char ** trigger_patterns, size_t num_trigger_patterns, const llama_token * trigger_tokens, size_t num_trigger_tokens)
+struct llama_sampler * llama_sampler_init_greedy(void)
+struct llama_sampler * llama_sampler_init_infill(const struct llama_vocab * vocab)
+struct llama_sampler * llama_sampler_init_logit_bias( int32_t n_vocab, int32_t n_logit_bias, const llama_logit_bias * logit_bias)
+struct llama_sampler * llama_sampler_init_min_p (float p, size_t min_keep)
+struct llama_sampler * llama_sampler_init_mirostat( int32_t n_vocab, uint32_t seed, float tau, float eta, int32_t m)
+struct llama_sampler * llama_sampler_init_mirostat_v2( uint32_t seed, float tau, float eta)
+struct llama_sampler * llama_sampler_init_penalties( int32_t penalty_last_n, float penalty_repeat, float penalty_freq, float penalty_present)
+struct llama_sampler * llama_sampler_init_temp (float t)
+struct llama_sampler * llama_sampler_init_temp_ext (float t, float delta, float exponent)
+struct llama_sampler * llama_sampler_init_top_k (int32_t k)
+struct llama_sampler * llama_sampler_init_top_n_sigma(float n)
+struct llama_sampler * llama_sampler_init_top_p (float p, size_t min_keep)
+struct llama_sampler * llama_sampler_init_typical (float p, size_t min_keep)
+struct llama_sampler * llama_sampler_init_xtc (float p, float t, size_t min_keep, uint32_t seed)
+const char * llama_sampler_name (const struct llama_sampler * smpl)
+void llama_sampler_reset ( struct llama_sampler * smpl)
+llama_token llama_sampler_sample(struct llama_sampler * smpl, struct llama_context * ctx, int32_t idx)
+bool llama_save_session_file( struct llama_context * ctx, const char * path_session, const llama_token * tokens, size_t n_token_count)
+void llama_set_abort_callback(struct llama_context * ctx, ggml_abort_callback abort_callback, void * abort_callback_data)
+int32_t llama_set_adapter_cvec( struct llama_context * ctx, const float * data, size_t len, int32_t n_embd, int32_t il_start, int32_t il_end)
+int32_t llama_set_adapters_lora( struct llama_context * ctx, struct llama_adapter_lora ** adapters, size_t n_adapters, float * scales)
+void llama_set_causal_attn(struct llama_context * ctx, bool causal_attn)
+void llama_set_embeddings(struct llama_context * ctx, bool embeddings)
+void llama_set_n_threads(struct llama_context * ctx, int32_t n_threads, int32_t n_threads_batch)
+bool llama_set_sampler(struct llama_context * ctx, llama_seq_id seq_id, struct llama_sampler * smpl)
+size_t llama_set_state_data( struct llama_context * ctx, const uint8_t * src)
+void llama_set_warmup(struct llama_context * ctx, bool warmup)
+int32_t llama_split_path(char * split_path, size_t maxlen, const char * path_prefix, int32_t split_no, int32_t split_count)
+int32_t llama_split_prefix(char * split_prefix, size_t maxlen, const char * split_path, int32_t split_no, int32_t split_count)
+size_t llama_state_get_data( struct llama_context * ctx, uint8_t * dst, size_t size)
+size_t llama_state_get_size(struct llama_context * ctx)
+bool llama_state_load_file( struct llama_context * ctx, const char * path_session, llama_token * tokens_out, size_t n_token_capacity, size_t * n_token_count_out)
+bool llama_state_save_file( struct llama_context * ctx, const char * path_session, const llama_token * tokens, size_t n_token_count)
+size_t llama_state_seq_get_data( struct llama_context * ctx, uint8_t * dst, size_t size, llama_seq_id seq_id)
+size_t llama_state_seq_get_data_ext( struct llama_context * ctx, uint8_t * dst, size_t size, llama_seq_id seq_id, llama_state_seq_flags flags)
+size_t llama_state_seq_get_size( struct llama_context * ctx, llama_seq_id seq_id)
+size_t llama_state_seq_get_size_ext( struct llama_context * ctx, llama_seq_id seq_id, llama_state_seq_flags flags)
+size_t llama_state_seq_load_file( struct llama_context * ctx, const char * filepath, llama_seq_id dest_seq_id, llama_token * tokens_out, size_t n_token_capacity, size_t * n_token_count_out)
+size_t llama_state_seq_save_file( struct llama_context * ctx, const char * filepath, llama_seq_id seq_id, const llama_token * tokens, size_t n_token_count)
+size_t llama_state_seq_set_data( struct llama_context * ctx, const uint8_t * src, size_t size, llama_seq_id dest_seq_id)
+size_t llama_state_seq_set_data_ext( struct llama_context * ctx, const uint8_t * src, size_t size, llama_seq_id dest_seq_id, llama_state_seq_flags flags)
+size_t llama_state_set_data( struct llama_context * ctx, const uint8_t * src, size_t size)
+bool llama_supports_gpu_offload(void)
+bool llama_supports_mlock (void)
+bool llama_supports_mmap (void)
+bool llama_supports_rpc (void)
+void llama_synchronize(struct llama_context * ctx)
+int64_t llama_time_us(void)
+llama_token llama_token_bos(const struct llama_vocab * vocab)
+llama_token llama_token_cls(const struct llama_vocab * vocab)
+llama_token llama_token_eos(const struct llama_vocab * vocab)
+llama_token llama_token_eot(const struct llama_vocab * vocab)
+llama_token llama_token_fim_mid(const struct llama_vocab * vocab)
+llama_token llama_token_fim_pad(const struct llama_vocab * vocab)
+llama_token llama_token_fim_pre(const struct llama_vocab * vocab)
+llama_token llama_token_fim_rep(const struct llama_vocab * vocab)
+llama_token llama_token_fim_sep(const struct llama_vocab * vocab)
+llama_token llama_token_fim_suf(const struct llama_vocab * vocab)
+enum llama_token_attr llama_token_get_attr(const struct llama_vocab * vocab, llama_token token)
+float llama_token_get_score(const struct llama_vocab * vocab, llama_token token)
+const char * llama_token_get_text(const struct llama_vocab * vocab, llama_token token)
+bool llama_token_is_control(const struct llama_vocab * vocab, llama_token token)
+bool llama_token_is_eog(const struct llama_vocab * vocab, llama_token token)
+llama_token llama_token_nl (const struct llama_vocab * vocab)
+llama_token llama_token_pad(const struct llama_vocab * vocab)
+llama_token llama_token_sep(const struct llama_vocab * vocab)
+int32_t llama_token_to_piece( const struct llama_vocab * vocab, llama_token token, char * buf, int32_t length, int32_t lstrip, bool special)
+int32_t llama_tokenize( const struct llama_vocab * vocab, const char * text, int32_t text_len, llama_token * tokens, int32_t n_tokens_max, bool add_special, bool parse_special)
+llama_token llama_vocab_bos(const struct llama_vocab * vocab)
+llama_token llama_vocab_cls(const struct llama_vocab * vocab)
+llama_token llama_vocab_eos(const struct llama_vocab * vocab)
+llama_token llama_vocab_eot(const struct llama_vocab * vocab)
+llama_token llama_vocab_fim_mid(const struct llama_vocab * vocab)
+llama_token llama_vocab_fim_pad(const struct llama_vocab * vocab)
+llama_token llama_vocab_fim_pre(const struct llama_vocab * vocab)
+llama_token llama_vocab_fim_rep(const struct llama_vocab * vocab)
+llama_token llama_vocab_fim_sep(const struct llama_vocab * vocab)
+llama_token llama_vocab_fim_suf(const struct llama_vocab * vocab)
+bool llama_vocab_get_add_bos(const struct llama_vocab * vocab)
+bool llama_vocab_get_add_eos(const struct llama_vocab * vocab)
+bool llama_vocab_get_add_sep(const struct llama_vocab * vocab)
+enum llama_token_attr llama_vocab_get_attr(const struct llama_vocab * vocab, llama_token token)
+float llama_vocab_get_score(const struct llama_vocab * vocab, llama_token token)
+const char * llama_vocab_get_text(const struct llama_vocab * vocab, llama_token token)
+bool llama_vocab_is_control(const struct llama_vocab * vocab, llama_token token)
+bool llama_vocab_is_eog(const struct llama_vocab * vocab, llama_token token)
+llama_token llama_vocab_mask(const struct llama_vocab * vocab)
+int32_t llama_vocab_n_tokens(const struct llama_vocab * vocab)
+llama_token llama_vocab_nl (const struct llama_vocab * vocab)
+llama_token llama_vocab_pad(const struct llama_vocab * vocab)
+llama_token llama_vocab_sep(const struct llama_vocab * vocab)
+enum llama_vocab_type llama_vocab_type(const struct llama_vocab * vocab)

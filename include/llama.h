@@ -12,7 +12,19 @@
 #include <stdio.h>
 #include <stdbool.h>
 
-#include "llama_export.h"
+#ifdef LLAMA_SHARED
+#    if defined(_WIN32) && !defined(__MINGW32__)
+#        ifdef LLAMA_BUILD
+#            define LLAMA_API __declspec(dllexport)
+#        else
+#            define LLAMA_API __declspec(dllimport)
+#        endif
+#    else
+#        define LLAMA_API __attribute__ ((visibility ("default")))
+#    endif
+#else
+#    define LLAMA_API
+#endif
 
 #ifdef __GNUC__
 #    define DEPRECATED(func, hint) func __attribute__((deprecated(hint)))
