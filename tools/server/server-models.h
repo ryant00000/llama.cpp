@@ -100,6 +100,7 @@ private:
         std::thread th;
         server_model_meta meta;
         FILE * stdin_file = nullptr;
+        uint64_t active_refs = 0;
     };
 
     std::mutex mutex;
@@ -173,6 +174,12 @@ public:
 
     // proxy an HTTP request to the model instance
     server_http_res_ptr proxy_request(const server_http_req & req, const std::string & method, const std::string & name, bool update_last_used);
+
+    // Increase instance ref counter
+    void inc_refs(const std::string & name);
+
+    // Decrease instance ref counter
+    void dec_refs(const std::string & name);
 
     // return true if the current process is a child server instance
     static bool is_child_server();

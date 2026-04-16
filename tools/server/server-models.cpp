@@ -517,6 +517,19 @@ std::vector<server_model_meta> server_models::get_all_meta() {
     return result;
 }
 
+void server_models::inc_refs(const std::string & name) {
+    std::lock_guard<std::mutex> lk(mutex);
+    mapping[name].active_refs++;
+}
+
+void server_models::dec_refs(const std::string & name) {
+    {
+        std::lock_guard<std::mutex> lk(mutex);
+        mapping[name].active_refs--;
+    }
+    cv.notify_all();
+}
+
 int server_models::can_fit(const device_memory_map & dmm_req) const {
     device_memory_map dmm_total;
     for (const auto & m : mapping) {
@@ -573,7 +586,8 @@ void server_models::unload_lru(const device_memory_map & dmm_req) {
             for (const auto & m : mapping) {
                 if (m.second.meta.is_running()) {
                     count_active++;
-                    if (m.second.meta.last_used < lru_last_used) {
+                    // Only consider idle models
+                    if (m.second.active_refs == 0 && m.second.meta.last_used < lru_last_used) {
                         lru_model_name = m.first;
                         lru_last_used = m.second.meta.last_used;
                     }
@@ -597,6 +611,21 @@ void server_models::unload_lru(const device_memory_map & dmm_req) {
                 cv.wait(lk, [this, &lru_model_name]() {
                     return mapping[lru_model_name].meta.status == SERVER_MODEL_STATUS_UNLOADED;
                 });
+            }
+        } else if (count_active > 0 && (active_exceeded || memory_exceeded)) {
+            // No model idle, wait for drain
+            std::unique_lock<std::mutex> lk(mutex);
+            bool drained = cv.wait_for(lk, std::chrono::seconds(DEFAULT_STOP_TIMEOUT), [this]() {
+                for (const auto & m : mapping) {
+                    if (m.second.meta.is_running() && m.second.active_refs == 0) {
+                        return true;
+                    }
+                }
+                return false;
+            });
+            if (!drained) {
+                SRV_WRN("%s", "drain timeout, falling back to force eviction\n");
+                break;
             }
         } else {
             break;
@@ -833,6 +862,7 @@ void server_models::_load(const std::string & name, const device_memory_map & dm
     inst.meta.port      = get_free_port();
     inst.meta.status    = SERVER_MODEL_STATUS_LOADING;
     inst.meta.last_used = ggml_time_ms();
+    inst.active_refs = mapping[name].active_refs;
 
     if (inst.meta.port <= 0) {
         throw std::runtime_error("failed to get a port number");
@@ -1168,10 +1198,18 @@ static bool router_validate_model(std::string & name, server_models & models, bo
     }
     // resolve alias to canonical model name
     name = meta->name;
+    // To avoid unloading a model before it is loaded, protect with increased ref count before it starts loading
+    models.inc_refs(name);
     if (models_autoload) {
-        models.ensure_model_ready(name);
+        try {
+            models.ensure_model_ready(name);
+        } catch (...) {
+            models.dec_refs(name);
+            throw;
+        }
     } else {
         if (!meta->is_running()) {
+            models.dec_refs(name);
             res_err(res, format_error_response("model is not loaded", ERROR_TYPE_INVALID_REQUEST));
             return false;
         }
@@ -1222,7 +1260,17 @@ void server_models_routes::init_routes() {
         if (!router_validate_model(name, models, autoload, error_res)) {
             return error_res;
         }
-        return models.proxy_request(req, method, name, false);
+        server_http_res_ptr proxy;
+        try {
+            proxy = models.proxy_request(req, method, name, false);
+        } catch(...) {
+            models.dec_refs(name);
+            throw;
+        }
+        proxy->on_destroy = [this, name]() {
+            this->models.dec_refs(name);
+        };
+        return proxy;
     };
 
     this->proxy_post = [this](const server_http_req & req) {
@@ -1234,7 +1282,17 @@ void server_models_routes::init_routes() {
         if (!router_validate_model(name, models, autoload, error_res)) {
             return error_res;
         }
-        return models.proxy_request(req, method, name, true); // update last usage for POST request only
+        server_http_res_ptr proxy;
+        try {
+            proxy = models.proxy_request(req, method, name, true); // update last usage for POST request only
+        } catch(...) {
+            models.dec_refs(name);
+            throw;
+        }
+        proxy->on_destroy = [this, name]() {
+            this->models.dec_refs(name);
+        };
+        return proxy;
     };
 
     this->post_router_models_load = [this](const server_http_req & req) {
