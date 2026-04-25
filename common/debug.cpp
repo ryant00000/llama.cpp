@@ -47,8 +47,7 @@ static float common_ggml_get_float_value(const uint8_t * data,
 
 #define INDENT "    "
 
-template <bool abort>
-void common_debug_print_tensor(uint8_t * data, ggml_type type, const int64_t * ne, const size_t * nb, int64_t n) {
+void common_debug_print_tensor(uint8_t * data, ggml_type type, const int64_t * ne, const size_t * nb, int64_t n, bool abort_on_nan) {
     GGML_ASSERT(n > 0);
     float sum = 0;
     for (int64_t i3 = 0; i3 < ne[3]; i3++) {
@@ -94,7 +93,7 @@ void common_debug_print_tensor(uint8_t * data, ggml_type type, const int64_t * n
         LOG(INDENT "sum = %f\n", sum);
     }
 
-    if constexpr (abort) {
+    if (abort_on_nan) {
         if (std::isnan(sum)) {
             LOG("encountered NaN - aborting\n");
             exit(0);
@@ -112,7 +111,7 @@ void common_debug_print_tensor(uint8_t * data, ggml_type type, const int64_t * n
  * @param user_data user data to pass at each call back
  * @return true to receive data or continue the graph, false otherwise
  */
-template <bool abort_on_nan> bool common_debug_cb_eval(struct ggml_tensor * t, bool ask, void * user_data) {
+bool common_debug_cb_eval(struct ggml_tensor * t, bool ask, void * user_data) {
     auto * cb_data = (base_callback_data *) user_data;
 
     const struct ggml_tensor * src0 = t->src[0];
@@ -154,14 +153,8 @@ template <bool abort_on_nan> bool common_debug_cb_eval(struct ggml_tensor * t, b
 
     if (!ggml_is_quantized(t->type) && matches_filter) {
         uint8_t * data = is_host ? (uint8_t *) t->data : cb_data->data.data();
-        common_debug_print_tensor<abort_on_nan>(data, t->type, t->ne, t->nb, 3);
+        common_debug_print_tensor(data, t->type, t->ne, t->nb, 3, cb_data->abort_on_nan);
     }
 
     return true;
 }
-
-// Explicit template instantiations
-template bool common_debug_cb_eval<false>(ggml_tensor *, bool, void *);
-template bool common_debug_cb_eval<true>(ggml_tensor *, bool, void *);
-template void common_debug_print_tensor<false>(uint8_t *, ggml_type, const int64_t *, const size_t *, int64_t);
-template void common_debug_print_tensor<true>(uint8_t *, ggml_type, const int64_t *, const size_t *, int64_t);

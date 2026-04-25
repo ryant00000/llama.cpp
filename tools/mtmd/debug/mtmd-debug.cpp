@@ -89,7 +89,7 @@ int main(int argc, char ** argv) {
         {
             // always enable debug callback
             mparams.cb_eval_user_data = &cb_data;
-            mparams.cb_eval = common_debug_cb_eval<false>;
+            mparams.cb_eval = common_debug_cb_eval;
         }
         ctx_mtmd.reset(mtmd_init_from_file(clip_path, model, mparams));
         if (!ctx_mtmd.get()) {
