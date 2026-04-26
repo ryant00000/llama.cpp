@@ -568,8 +568,8 @@ static bool common_params_parse_ex(int argc, char ** argv, common_params_context
     postprocess_cpu_params(params.cpuparams,       nullptr);
     postprocess_cpu_params(params.cpuparams_batch, &params.cpuparams);
 
-    postprocess_cpu_params(params.speculative.cpuparams,       &params.cpuparams);
-    postprocess_cpu_params(params.speculative.cpuparams_batch, &params.cpuparams_batch);
+    postprocess_cpu_params(params.speculative.draft.cpuparams,       &params.cpuparams);
+    postprocess_cpu_params(params.speculative.draft.cpuparams_batch, &params.cpuparams_batch);
 
     if (params.prompt_cache_all && (params.interactive || params.interactive_first)) {
         throw std::invalid_argument("error: --prompt-cache-all not supported in interactive mode yet\n");
@@ -591,8 +591,8 @@ static bool common_params_parse_ex(int argc, char ** argv, common_params_context
                 break;
             }
         }
-        common_params_handle_model(params.speculative.mparams_dft, params.hf_token, params.offline);
-        common_params_handle_model(params.vocoder.model,           params.hf_token, params.offline);
+        common_params_handle_model(params.speculative.draft.mparams, params.hf_token, params.offline);
+        common_params_handle_model(params.vocoder.model,             params.hf_token, params.offline);
     }
 
     // model is required (except for server)
@@ -611,7 +611,7 @@ static bool common_params_parse_ex(int argc, char ** argv, common_params_context
         for (auto & seq_breaker : params.sampling.dry_sequence_breakers) {
             string_process_escapes(seq_breaker);
         }
-        for (auto & pair : params.speculative.replacements) {
+        for (auto & pair : params.speculative.draft.replacements) {
             string_process_escapes(pair.first);
             string_process_escapes(pair.second);
         }
@@ -628,8 +628,8 @@ static bool common_params_parse_ex(int argc, char ** argv, common_params_context
         params.tensor_buft_overrides.push_back({nullptr, nullptr});
     }
 
-    if (!params.speculative.tensor_buft_overrides.empty()) {
-        params.speculative.tensor_buft_overrides.push_back({nullptr, nullptr});
+    if (!params.speculative.draft.tensor_buft_overrides.empty()) {
+        params.speculative.draft.tensor_buft_overrides.push_back({nullptr, nullptr});
     }
 
     if (!params.chat_template.empty() && !common_chat_verify_template(params.chat_template, params.use_jinja)) {
@@ -1223,14 +1223,14 @@ common_params_context common_params_parser_init(common_params & params, llama_ex
         {"-lcs", "--lookup-cache-static"}, "FNAME",
         "path to static lookup cache to use for lookup decoding (not updated by generation)",
         [](common_params & params, const std::string & value) {
-            params.speculative.lookup_cache_static = value;
+            params.speculative.ngram_cache.lookup_cache_static = value;
         }
     ).set_examples({LLAMA_EXAMPLE_LOOKUP, LLAMA_EXAMPLE_SERVER}));
     add_opt(common_arg(
         {"-lcd", "--lookup-cache-dynamic"}, "FNAME",
         "path to dynamic lookup cache to use for lookup decoding (updated by generation)",
         [](common_params & params, const std::string & value) {
-            params.speculative.lookup_cache_dynamic = value;
+            params.speculative.ngram_cache.lookup_cache_dynamic = value;
         }
     ).set_examples({LLAMA_EXAMPLE_LOOKUP, LLAMA_EXAMPLE_SERVER}));
     add_opt(common_arg(
@@ -2284,12 +2284,6 @@ common_params_context common_params_parser_init(common_params & params, llama_ex
         }
     ).set_env("LLAMA_ARG_OVERRIDE_TENSOR"));
     add_opt(common_arg(
-        {"-otd", "--override-tensor-draft"}, "<tensor name pattern>=<buffer type>,...",
-        "override tensor buffer type for draft model", [](common_params & params, const std::string & value) {
-            parse_tensor_buffer_overrides(value, params.speculative.tensor_buft_overrides);
-        }
-    ).set_examples({LLAMA_EXAMPLE_SPECULATIVE, LLAMA_EXAMPLE_SERVER, LLAMA_EXAMPLE_CLI}));
-    add_opt(common_arg(
         {"-cmoe", "--cpu-moe"},
         "keep all Mixture of Experts (MoE) weights in the CPU",
         [](common_params & params) {
@@ -2311,27 +2305,6 @@ common_params_context common_params_parser_init(common_params & params, llama_ex
             }
         }
     ).set_env("LLAMA_ARG_N_CPU_MOE"));
-    add_opt(common_arg(
-        {"-cmoed", "--cpu-moe-draft"},
-        "keep all Mixture of Experts (MoE) weights in the CPU for the draft model",
-        [](common_params & params) {
-            params.speculative.tensor_buft_overrides.push_back(llm_ffn_exps_cpu_override());
-        }
-    ).set_examples({LLAMA_EXAMPLE_SPECULATIVE, LLAMA_EXAMPLE_SERVER, LLAMA_EXAMPLE_CLI}).set_env("LLAMA_ARG_CPU_MOE_DRAFT"));
-    add_opt(common_arg(
-        {"-ncmoed", "--n-cpu-moe-draft"}, "N",
-        "keep the Mixture of Experts (MoE) weights of the first N layers in the CPU for the draft model",
-        [](common_params & params, int value) {
-            if (value < 0) {
-                throw std::invalid_argument("invalid value");
-            }
-            for (int i = 0; i < value; ++i) {
-                static std::list<std::string> buft_overrides_draft;
-                buft_overrides_draft.push_back(llm_ffn_exps_block_regex(i));
-                params.speculative.tensor_buft_overrides.push_back({buft_overrides_draft.back().c_str(), ggml_backend_cpu_buffer_type()});
-            }
-        }
-    ).set_examples({LLAMA_EXAMPLE_SPECULATIVE, LLAMA_EXAMPLE_SERVER, LLAMA_EXAMPLE_CLI}).set_env("LLAMA_ARG_N_CPU_MOE_DRAFT"));
     GGML_ASSERT(params.n_gpu_layers < 0); // string_format would need to be extended for a default >= 0
     add_opt(common_arg(
         {"-ngl", "--gpu-layers", "--n-gpu-layers"}, "N",
@@ -2614,13 +2587,6 @@ common_params_context common_params_parser_init(common_params & params, llama_ex
             params.model.hf_repo = value;
         }
     ).set_env("LLAMA_ARG_HF_REPO"));
-    add_opt(common_arg(
-        {"-hfd", "-hfrd", "--hf-repo-draft"}, "<user>/<model>[:quant]",
-        "Same as --hf-repo, but for the draft model (default: unused)",
-        [](common_params & params, const std::string & value) {
-            params.speculative.mparams_dft.hf_repo = value;
-        }
-    ).set_env("LLAMA_ARG_HFD_REPO"));
     add_opt(common_arg(
         {"-hff", "--hf-file"}, "FILE",
         "Hugging Face model file. If specified, it will override the quant in --hf-repo (default: unused)",
@@ -3330,170 +3296,235 @@ common_params_context common_params_parser_init(common_params & params, llama_ex
         }
     ).set_env("LLAMA_LOG_TIMESTAMPS"));
 
+    //
     // speculative parameters
+    //
+
     add_opt(common_arg(
-        {"-td", "--threads-draft"}, "N",
+        {"--spec-draft-hf", "-hfd", "-hfrd", "--hf-repo-draft"}, "<user>/<model>[:quant]",
+        "Same as --hf-repo, but for the draft model (default: unused)",
+        [](common_params & params, const std::string & value) {
+            params.speculative.draft.mparams.hf_repo = value;
+        }
+    ).set_examples({LLAMA_EXAMPLE_SPECULATIVE, LLAMA_EXAMPLE_SERVER, LLAMA_EXAMPLE_CLI}).set_env("LLAMA_ARG_SPEC_DRAFT_HF_REPO"));
+    add_opt(common_arg(
+        {"--spec-draft-threads", "-td", "--threads-draft"}, "N",
         "number of threads to use during generation (default: same as --threads)",
         [](common_params & params, int value) {
-            params.speculative.cpuparams.n_threads = value;
-            if (params.speculative.cpuparams.n_threads <= 0) {
-                params.speculative.cpuparams.n_threads = std::thread::hardware_concurrency();
+            params.speculative.draft.cpuparams.n_threads = value;
+            if (params.speculative.draft.cpuparams.n_threads <= 0) {
+                params.speculative.draft.cpuparams.n_threads = std::thread::hardware_concurrency();
             }
         }
-    ).set_examples({LLAMA_EXAMPLE_SPECULATIVE, LLAMA_EXAMPLE_SERVER}));
+    ).set_examples({LLAMA_EXAMPLE_SPECULATIVE, LLAMA_EXAMPLE_SERVER, LLAMA_EXAMPLE_CLI}));
     add_opt(common_arg(
-        {"-tbd", "--threads-batch-draft"}, "N",
+        {"--spec-draft-threads-batch", "-tbd", "--threads-batch-draft"}, "N",
         "number of threads to use during batch and prompt processing (default: same as --threads-draft)",
         [](common_params & params, int value) {
-            params.speculative.cpuparams_batch.n_threads = value;
-            if (params.speculative.cpuparams_batch.n_threads <= 0) {
-                params.speculative.cpuparams_batch.n_threads = std::thread::hardware_concurrency();
+            params.speculative.draft.cpuparams_batch.n_threads = value;
+            if (params.speculative.draft.cpuparams_batch.n_threads <= 0) {
+                params.speculative.draft.cpuparams_batch.n_threads = std::thread::hardware_concurrency();
             }
         }
-    ).set_examples({LLAMA_EXAMPLE_SPECULATIVE, LLAMA_EXAMPLE_SERVER}));
+    ).set_examples({LLAMA_EXAMPLE_SPECULATIVE, LLAMA_EXAMPLE_SERVER, LLAMA_EXAMPLE_CLI}));
     add_opt(common_arg(
-        {"-Cd", "--cpu-mask-draft"}, "M",
+        {"--spec-draft-cpu-mask", "-Cd", "--cpu-mask-draft"}, "M",
         "Draft model CPU affinity mask. Complements cpu-range-draft (default: same as --cpu-mask)",
         [](common_params & params, const std::string & mask) {
-            params.speculative.cpuparams.mask_valid = true;
-            if (!parse_cpu_mask(mask, params.speculative.cpuparams.cpumask)) {
+            params.speculative.draft.cpuparams.mask_valid = true;
+            if (!parse_cpu_mask(mask, params.speculative.draft.cpuparams.cpumask)) {
                 throw std::invalid_argument("invalid cpumask");
             }
         }
-    ).set_examples({LLAMA_EXAMPLE_SPECULATIVE}));
+    ).set_examples({LLAMA_EXAMPLE_SPECULATIVE, LLAMA_EXAMPLE_SERVER, LLAMA_EXAMPLE_CLI}));
     add_opt(common_arg(
-        {"-Crd", "--cpu-range-draft"}, "lo-hi",
+        {"--spec-draft-cpu-range", "-Crd", "--cpu-range-draft"}, "lo-hi",
         "Ranges of CPUs for affinity. Complements --cpu-mask-draft",
         [](common_params & params, const std::string & range) {
-            params.speculative.cpuparams.mask_valid = true;
-            if (!parse_cpu_range(range, params.speculative.cpuparams.cpumask)) {
+            params.speculative.draft.cpuparams.mask_valid = true;
+            if (!parse_cpu_range(range, params.speculative.draft.cpuparams.cpumask)) {
                 throw std::invalid_argument("invalid range");
             }
         }
-    ).set_examples({LLAMA_EXAMPLE_SPECULATIVE}));
+    ).set_examples({LLAMA_EXAMPLE_SPECULATIVE, LLAMA_EXAMPLE_SERVER, LLAMA_EXAMPLE_CLI}));
     add_opt(common_arg(
-        {"--cpu-strict-draft"}, "<0|1>",
+        {"--spec-draft-cpu-strict", "--cpu-strict-draft"}, "<0|1>",
         "Use strict CPU placement for draft model (default: same as --cpu-strict)",
         [](common_params & params, int value) {
-            params.speculative.cpuparams.strict_cpu = value;
+            params.speculative.draft.cpuparams.strict_cpu = value;
         }
-    ).set_examples({LLAMA_EXAMPLE_SPECULATIVE}));
+    ).set_examples({LLAMA_EXAMPLE_SPECULATIVE, LLAMA_EXAMPLE_SERVER, LLAMA_EXAMPLE_CLI}));
     add_opt(common_arg(
-        {"--prio-draft"}, "N",
-        string_format("set draft process/thread priority : 0-normal, 1-medium, 2-high, 3-realtime (default: %d)\n", params.speculative.cpuparams.priority),
+        {"--spec-draft-prio", "--prio-draft"}, "N",
+        string_format("set draft process/thread priority : 0-normal, 1-medium, 2-high, 3-realtime (default: %d)\n", params.speculative.draft.cpuparams.priority),
         [](common_params & params, int prio) {
             if (prio < 0 || prio > 3) {
                 throw std::invalid_argument("invalid value");
             }
-            params.speculative.cpuparams.priority = (enum ggml_sched_priority) prio;
+            params.speculative.draft.cpuparams.priority = (enum ggml_sched_priority) prio;
         }
-    ).set_examples({LLAMA_EXAMPLE_SPECULATIVE}));
+    ).set_examples({LLAMA_EXAMPLE_SPECULATIVE, LLAMA_EXAMPLE_SERVER, LLAMA_EXAMPLE_CLI}));
     add_opt(common_arg(
-        {"--poll-draft"}, "<0|1>",
+        {"--spec-draft-poll", "--poll-draft"}, "<0|1>",
         "Use polling to wait for draft model work (default: same as --poll])",
         [](common_params & params, int value) {
-            params.speculative.cpuparams.poll = value;
+            params.speculative.draft.cpuparams.poll = value;
         }
-    ).set_examples({LLAMA_EXAMPLE_SPECULATIVE}));
+    ).set_examples({LLAMA_EXAMPLE_SPECULATIVE, LLAMA_EXAMPLE_SERVER, LLAMA_EXAMPLE_CLI}));
     add_opt(common_arg(
-        {"-Cbd", "--cpu-mask-batch-draft"}, "M",
+        {"--spec-draft-cpu-mask-batch", "-Cbd", "--cpu-mask-batch-draft"}, "M",
         "Draft model CPU affinity mask. Complements cpu-range-draft (default: same as --cpu-mask)",
         [](common_params & params, const std::string & mask) {
-            params.speculative.cpuparams_batch.mask_valid = true;
-            if (!parse_cpu_mask(mask, params.speculative.cpuparams_batch.cpumask)) {
+            params.speculative.draft.cpuparams_batch.mask_valid = true;
+            if (!parse_cpu_mask(mask, params.speculative.draft.cpuparams_batch.cpumask)) {
                 throw std::invalid_argument("invalid cpumask");
             }
         }
-    ).set_examples({LLAMA_EXAMPLE_SPECULATIVE}));
+    ).set_examples({LLAMA_EXAMPLE_SPECULATIVE, LLAMA_EXAMPLE_SERVER, LLAMA_EXAMPLE_CLI}));
     add_opt(common_arg(
-        {"-Crbd", "--cpu-range-batch-draft"}, "lo-hi",
+        {"--spec-draft-cpu-range-batch", "-Crbd", "--cpu-range-batch-draft"}, "lo-hi",
         "Ranges of CPUs for affinity. Complements --cpu-mask-draft-batch)",
         [](common_params & params, const std::string & range) {
-            params.speculative.cpuparams_batch.mask_valid = true;
-            if (!parse_cpu_range(range, params.speculative.cpuparams_batch.cpumask)) {
+            params.speculative.draft.cpuparams_batch.mask_valid = true;
+            if (!parse_cpu_range(range, params.speculative.draft.cpuparams_batch.cpumask)) {
                 throw std::invalid_argument("invalid cpumask");
             }
         }
     ).set_examples({LLAMA_EXAMPLE_SPECULATIVE}));
     add_opt(common_arg(
-        {"--cpu-strict-batch-draft"}, "<0|1>",
+        {"--spec-draft-cpu-strict-batch", "--cpu-strict-batch-draft"}, "<0|1>",
         "Use strict CPU placement for draft model (default: --cpu-strict-draft)",
         [](common_params & params, int value) {
-            params.speculative.cpuparams_batch.strict_cpu = value;
+            params.speculative.draft.cpuparams_batch.strict_cpu = value;
         }
-    ).set_examples({LLAMA_EXAMPLE_SPECULATIVE}));
+    ).set_examples({LLAMA_EXAMPLE_SPECULATIVE, LLAMA_EXAMPLE_SERVER, LLAMA_EXAMPLE_CLI}));
     add_opt(common_arg(
-        {"--prio-batch-draft"}, "N",
-        string_format("set draft process/thread priority : 0-normal, 1-medium, 2-high, 3-realtime (default: %d)\n", params.speculative.cpuparams_batch.priority),
+        {"--spec-draft-prio-batch", "--prio-batch-draft"}, "N",
+        string_format("set draft process/thread priority : 0-normal, 1-medium, 2-high, 3-realtime (default: %d)\n", params.speculative.draft.cpuparams_batch.priority),
         [](common_params & params, int prio) {
             if (prio < 0 || prio > 3) {
                 throw std::invalid_argument("invalid value");
             }
-            params.speculative.cpuparams_batch.priority = (enum ggml_sched_priority) prio;
+            params.speculative.draft.cpuparams_batch.priority = (enum ggml_sched_priority) prio;
         }
-    ).set_examples({LLAMA_EXAMPLE_SPECULATIVE}));
+    ).set_examples({LLAMA_EXAMPLE_SPECULATIVE, LLAMA_EXAMPLE_SERVER, LLAMA_EXAMPLE_CLI}));
     add_opt(common_arg(
-        {"--poll-batch-draft"}, "<0|1>",
+        {"--spec-draft-poll-batch", "--poll-batch-draft"}, "<0|1>",
         "Use polling to wait for draft model work (default: --poll-draft)",
         [](common_params & params, int value) {
-            params.speculative.cpuparams_batch.poll = value;
+            params.speculative.draft.cpuparams_batch.poll = value;
         }
-    ).set_examples({LLAMA_EXAMPLE_SPECULATIVE}));
+    ).set_examples({LLAMA_EXAMPLE_SPECULATIVE, LLAMA_EXAMPLE_SERVER, LLAMA_EXAMPLE_CLI}));
     add_opt(common_arg(
-        {"--draft", "--draft-n", "--draft-max"}, "N",
-        string_format("number of tokens to draft for speculative decoding (default: %d)", params.speculative.n_max),
-        [](common_params & params, int value) {
-            params.speculative.n_max = value;
-        }
-    ).set_examples({LLAMA_EXAMPLE_SPECULATIVE, LLAMA_EXAMPLE_LOOKUP, LLAMA_EXAMPLE_SERVER, LLAMA_EXAMPLE_CLI}).set_env("LLAMA_ARG_DRAFT_MAX"));
-    add_opt(common_arg(
-        {"--draft-min", "--draft-n-min"}, "N",
-        string_format("minimum number of draft tokens to use for speculative decoding (default: %d)", params.speculative.n_min),
-        [](common_params & params, int value) {
-            params.speculative.n_min = value;
-        }
-    ).set_examples({LLAMA_EXAMPLE_SPECULATIVE, LLAMA_EXAMPLE_LOOKUP, LLAMA_EXAMPLE_SERVER, LLAMA_EXAMPLE_CLI}).set_env("LLAMA_ARG_DRAFT_MIN"));
-    add_opt(common_arg(
-        {"--draft-p-split"}, "P",
-        string_format("speculative decoding split probability (default: %.2f)", (double)params.speculative.p_split),
+        {"--spec-draft-type-k", "-ctkd", "--cache-type-k-draft"}, "TYPE",
+        string_format(
+            "KV cache data type for K for the draft model\n"
+            "allowed values: %s\n"
+            "(default: %s)",
+            get_all_kv_cache_types().c_str(),
+            ggml_type_name(params.speculative.draft.cache_type_k)
+        ),
         [](common_params & params, const std::string & value) {
-            params.speculative.p_split = std::stof(value);
+            params.speculative.draft.cache_type_k = kv_cache_type_from_str(value);
         }
-    ).set_examples({LLAMA_EXAMPLE_SPECULATIVE}).set_env("LLAMA_ARG_DRAFT_P_SPLIT"));
+    ).set_env("LLAMA_ARG_SPEC_DRAFT_CACHE_TYPE_K"));
     add_opt(common_arg(
-        {"--draft-p-min"}, "P",
-        string_format("minimum speculative decoding probability (greedy) (default: %.2f)", (double)params.speculative.p_min),
+        {"--spec-draft-type-v", "-ctvd", "--cache-type-v-draft"}, "TYPE",
+        string_format(
+            "KV cache data type for V for the draft model\n"
+            "allowed values: %s\n"
+            "(default: %s)",
+            get_all_kv_cache_types().c_str(),
+            ggml_type_name(params.speculative.draft.cache_type_v)
+        ),
         [](common_params & params, const std::string & value) {
-            params.speculative.p_min = std::stof(value);
+            params.speculative.draft.cache_type_v = kv_cache_type_from_str(value);
         }
-    ).set_examples({LLAMA_EXAMPLE_SPECULATIVE, LLAMA_EXAMPLE_SERVER, LLAMA_EXAMPLE_CLI}).set_env("LLAMA_ARG_DRAFT_P_MIN"));
+    ).set_env("LLAMA_ARG_SPEC_DRAFT_CACHE_TYPE_V"));
     add_opt(common_arg(
-        {"-cd", "--ctx-size-draft"}, "N",
-        string_format("size of the prompt context for the draft model (default: %d, 0 = loaded from model)", params.speculative.n_ctx),
+        {"--spec-draft-override-tensor", "-otd", "--override-tensor-draft"}, "<tensor name pattern>=<buffer type>,...",
+        "override tensor buffer type for draft model", [](common_params & params, const std::string & value) {
+            parse_tensor_buffer_overrides(value, params.speculative.draft.tensor_buft_overrides);
+        }
+    ).set_examples({LLAMA_EXAMPLE_SPECULATIVE, LLAMA_EXAMPLE_SERVER, LLAMA_EXAMPLE_CLI}));
+    add_opt(common_arg(
+        {"--spec-draft-cpu-moe", "-cmoed", "--cpu-moe-draft"},
+        "keep all Mixture of Experts (MoE) weights in the CPU for the draft model",
+        [](common_params & params) {
+            params.speculative.draft.tensor_buft_overrides.push_back(llm_ffn_exps_cpu_override());
+        }
+    ).set_examples({LLAMA_EXAMPLE_SPECULATIVE, LLAMA_EXAMPLE_SERVER, LLAMA_EXAMPLE_CLI}).set_env("LLAMA_ARG_SPEC_DRAFT_CPU_MOE"));
+    add_opt(common_arg(
+        {"--spec-draft-n-cpu-moe", "--spec-draft-ncmoe", "-ncmoed", "--n-cpu-moe-draft"}, "N",
+        "keep the Mixture of Experts (MoE) weights of the first N layers in the CPU for the draft model",
         [](common_params & params, int value) {
-            params.speculative.n_ctx = value;
+            if (value < 0) {
+                throw std::invalid_argument("invalid value");
+            }
+            for (int i = 0; i < value; ++i) {
+                static std::list<std::string> buft_overrides_draft;
+                buft_overrides_draft.push_back(llm_ffn_exps_block_regex(i));
+                params.speculative.draft.tensor_buft_overrides.push_back({buft_overrides_draft.back().c_str(), ggml_backend_cpu_buffer_type()});
+            }
         }
-    ).set_examples({LLAMA_EXAMPLE_SPECULATIVE, LLAMA_EXAMPLE_SERVER, LLAMA_EXAMPLE_CLI}).set_env("LLAMA_ARG_CTX_SIZE_DRAFT"));
+    ).set_examples({LLAMA_EXAMPLE_SPECULATIVE, LLAMA_EXAMPLE_SERVER, LLAMA_EXAMPLE_CLI}).set_env("LLAMA_ARG_SPEC_DRAFT_N_CPU_MOE"));
+
     add_opt(common_arg(
-        {"-devd", "--device-draft"}, "<dev1,dev2,..>",
+        {"--spec-draft-n-max"}, "N",
+        string_format("number of tokens to draft for speculative decoding (default: %d)", params.speculative.draft.n_max),
+        [](common_params & params, int value) {
+            params.speculative.draft.n_max = value;
+        }
+    ).set_examples({LLAMA_EXAMPLE_SPECULATIVE, LLAMA_EXAMPLE_LOOKUP, LLAMA_EXAMPLE_SERVER, LLAMA_EXAMPLE_CLI}).set_env("LLAMA_ARG_SPEC_DRAFT_N_MAX"));
+    add_opt(common_arg(
+        {"--spec-draft-n-min"}, "N",
+        string_format("minimum number of draft tokens to use for speculative decoding (default: %d)", params.speculative.draft.n_min),
+        [](common_params & params, int value) {
+            params.speculative.draft.n_min = value;
+        }
+    ).set_examples({LLAMA_EXAMPLE_SPECULATIVE, LLAMA_EXAMPLE_LOOKUP, LLAMA_EXAMPLE_SERVER, LLAMA_EXAMPLE_CLI}).set_env("LLAMA_ARG_SPEC_DRAFT_N_MIN"));
+
+    add_opt(common_arg(
+        {"--spec--draft-p-split", "--draft-p-split"}, "P",
+        string_format("speculative decoding split probability (default: %.2f)", (double)params.speculative.draft.p_split),
+        [](common_params & params, const std::string & value) {
+            params.speculative.draft.p_split = std::stof(value);
+        }
+    ).set_examples({LLAMA_EXAMPLE_SPECULATIVE, LLAMA_EXAMPLE_SERVER, LLAMA_EXAMPLE_CLI}).set_env("LLAMA_ARG_SPEC_DRAFT_P_SPLIT"));
+    add_opt(common_arg(
+        {"--spec-draft-p-min", "--draft-p-min"}, "P",
+        string_format("minimum speculative decoding probability (greedy) (default: %.2f)", (double)params.speculative.draft.p_min),
+        [](common_params & params, const std::string & value) {
+            params.speculative.draft.p_min = std::stof(value);
+        }
+    ).set_examples({LLAMA_EXAMPLE_SPECULATIVE, LLAMA_EXAMPLE_SERVER, LLAMA_EXAMPLE_CLI}).set_env("LLAMA_ARG_SPEC_DRAFT_P_MIN"));
+    add_opt(common_arg(
+        {"--spec-draft-ctx-size", "-cd", "--ctx-size-draft"}, "N",
+        string_format("size of the prompt context for the draft model (default: %d, 0 = loaded from model)", params.speculative.draft.n_ctx),
+        [](common_params & params, int value) {
+            params.speculative.draft.n_ctx = value;
+        }
+    ).set_examples({LLAMA_EXAMPLE_SPECULATIVE, LLAMA_EXAMPLE_SERVER, LLAMA_EXAMPLE_CLI}).set_env("LLAMA_ARG_SPEC_DRAFT_CTX_SIZE"));
+    add_opt(common_arg(
+        {"--spec-draft-device", "-devd", "--device-draft"}, "<dev1,dev2,..>",
         "comma-separated list of devices to use for offloading the draft model (none = don't offload)\n"
         "use --list-devices to see a list of available devices",
         [](common_params & params, const std::string & value) {
-            params.speculative.devices = parse_device_list(value);
+            params.speculative.draft.devices = parse_device_list(value);
         }
     ).set_examples({LLAMA_EXAMPLE_SPECULATIVE, LLAMA_EXAMPLE_SERVER, LLAMA_EXAMPLE_CLI}));
-    GGML_ASSERT(params.speculative.n_gpu_layers < 0); // string_format would need to be extended for a default >= 0
+    GGML_ASSERT(params.speculative.draft.n_gpu_layers < 0); // string_format would need to be extended for a default >= 0
     add_opt(common_arg(
-        {"-ngld", "--gpu-layers-draft", "--n-gpu-layers-draft"}, "N",
+        {"--spec-draft-ngl", "-ngld", "--gpu-layers-draft", "--n-gpu-layers-draft"}, "N",
         string_format("max. number of draft model layers to store in VRAM, either an exact number, 'auto', or 'all' (default: %s)",
-            params.speculative.n_gpu_layers == -1 ? "auto" : "all"),
+            params.speculative.draft.n_gpu_layers == -1 ? "auto" : "all"),
         [](common_params & params, const std::string & value) {
             if (value == "auto") {
-                params.speculative.n_gpu_layers = -1;
+                params.speculative.draft.n_gpu_layers = -1;
             } else if (value == "all") {
-                params.speculative.n_gpu_layers = -2;
+                params.speculative.draft.n_gpu_layers = -2;
             } else {
-                params.speculative.n_gpu_layers = std::stoi(value);
+                params.speculative.draft.n_gpu_layers = std::stoi(value);
             }
             if (!llama_supports_gpu_offload()) {
                 fprintf(stderr, "warning: no usable GPU found, --gpu-layers-draft option will be ignored\n");
@@ -3503,17 +3534,17 @@ common_params_context common_params_parser_init(common_params & params, llama_ex
         }
     ).set_examples({LLAMA_EXAMPLE_SPECULATIVE, LLAMA_EXAMPLE_SERVER, LLAMA_EXAMPLE_CLI}).set_env("LLAMA_ARG_N_GPU_LAYERS_DRAFT"));
     add_opt(common_arg(
-        {"-md", "--model-draft"}, "FNAME",
+        {"--spec-draft-model", "-md", "--model-draft"}, "FNAME",
         "draft model for speculative decoding (default: unused)",
         [](common_params & params, const std::string & value) {
-            params.speculative.mparams_dft.path = value;
+            params.speculative.draft.mparams.path = value;
         }
-    ).set_examples({LLAMA_EXAMPLE_SPECULATIVE, LLAMA_EXAMPLE_SERVER, LLAMA_EXAMPLE_CLI}).set_env("LLAMA_ARG_MODEL_DRAFT"));
+    ).set_examples({LLAMA_EXAMPLE_SPECULATIVE, LLAMA_EXAMPLE_SERVER, LLAMA_EXAMPLE_CLI}).set_env("LLAMA_ARG_SPEC_DRAFT_MODEL"));
     add_opt(common_arg(
-        {"--spec-replace"}, "TARGET", "DRAFT",
+        {"--spec-draft-replace", "--spec-replace"}, "TARGET", "DRAFT",
         "translate the string in TARGET into DRAFT if the draft model and main model are not compatible",
         [](common_params & params, const std::string & tgt, const std::string & dft) {
-            params.speculative.replacements.push_back({ tgt, dft });
+            params.speculative.draft.replacements.push_back({ tgt, dft });
         }
     ).set_examples({LLAMA_EXAMPLE_SPECULATIVE, LLAMA_EXAMPLE_SERVER, LLAMA_EXAMPLE_CLI}));
     add_opt(common_arg(
@@ -3537,63 +3568,134 @@ common_params_context common_params_parser_init(common_params & params, llama_ex
                 throw std::invalid_argument("unknown speculative decoding type without draft model");
             }
         }
-    ).set_examples({LLAMA_EXAMPLE_SERVER}).set_env("LLAMA_ARG_SPEC_TYPE"));
+    ).set_examples({LLAMA_EXAMPLE_SPECULATIVE, LLAMA_EXAMPLE_SERVER, LLAMA_EXAMPLE_CLI}).set_env("LLAMA_ARG_SPEC_TYPE"));
     add_opt(common_arg(
-        {"--spec-ngram-size-n"}, "N",
-        string_format("ngram size N for ngram-simple/ngram-map speculative decoding, length of lookup n-gram (default: %d)", params.speculative.ngram_size_n),
+        {"--spec-ngram-mod-n-min"}, "N",
+        string_format("minimum number of ngram tokens to use for ngram-based speculative decoding (default: %d)", params.speculative.ngram_mod.n_min),
+        [](common_params & params, int value) {
+            if (value < 0 || value > 1024) {
+                throw std::invalid_argument("ngram n-min must be between 0 and 1024 inclusive");
+            }
+            params.speculative.ngram_mod.n_min = value;
+        }
+    ).set_examples({LLAMA_EXAMPLE_SPECULATIVE, LLAMA_EXAMPLE_SERVER, LLAMA_EXAMPLE_CLI}));
+    add_opt(common_arg(
+        {"--spec-ngram-mod-n-max"}, "N",
+        string_format("maximum number of ngram tokens to use for ngram-based speculative decoding (default: %d)", params.speculative.ngram_mod.n_max),
+        [](common_params & params, int value) {
+            if (value < 0 || value > 1024) {
+                throw std::invalid_argument("ngram n-max must be between 0 and 1024 inclusive");
+            }
+            params.speculative.ngram_mod.n_max = value;
+        }
+    ).set_examples({LLAMA_EXAMPLE_SPECULATIVE, LLAMA_EXAMPLE_SERVER, LLAMA_EXAMPLE_CLI}));
+    add_opt(common_arg(
+        {"--spec-ngram-mod-n-match"}, "N",
+        string_format("ngram-mod lookup length (default: %d)", params.speculative.ngram_mod.n_match),
         [](common_params & params, int value) {
             if (value < 1 || value > 1024) {
                 throw std::invalid_argument("ngram size N must be between 1 and 1024 inclusive");
             }
-            params.speculative.ngram_size_n = value;
+            params.speculative.ngram_mod.n_match = value;
         }
-    ).set_examples({LLAMA_EXAMPLE_SERVER}));
+    ).set_examples({LLAMA_EXAMPLE_SPECULATIVE, LLAMA_EXAMPLE_SERVER, LLAMA_EXAMPLE_CLI}));
+
     add_opt(common_arg(
-        {"--spec-ngram-size-m"}, "N",
-        string_format("ngram size M for ngram-simple/ngram-map speculative decoding, length of draft m-gram (default: %d)", params.speculative.ngram_size_m),
+        {"--spec-ngram-simple-size-n"}, "N",
+        string_format("ngram size N for ngram-simple speculative decoding, length of lookup n-gram (default: %d)", params.speculative.ngram_simple.size_n),
+        [](common_params & params, int value) {
+            if (value < 1 || value > 1024) {
+                throw std::invalid_argument("ngram size N must be between 1 and 1024 inclusive");
+            }
+            params.speculative.ngram_simple.size_n = value;
+        }
+    ).set_examples({LLAMA_EXAMPLE_SPECULATIVE, LLAMA_EXAMPLE_SERVER, LLAMA_EXAMPLE_CLI}));
+    add_opt(common_arg(
+        {"--spec-ngram-simple-size-m"}, "N",
+        string_format("ngram size M for ngram-simple speculative decoding, length of draft m-gram (default: %d)", params.speculative.ngram_simple.size_m),
         [](common_params & params, int value) {
             if (value < 1 || value > 1024) {
                 throw std::invalid_argument("ngram size M must be between 1 and 1024 inclusive");
             }
-            params.speculative.ngram_size_m = value;
+            params.speculative.ngram_simple.size_m = value;
         }
-    ).set_examples({LLAMA_EXAMPLE_SERVER}));
+    ).set_examples({LLAMA_EXAMPLE_SPECULATIVE, LLAMA_EXAMPLE_SERVER, LLAMA_EXAMPLE_CLI}));
     add_opt(common_arg(
-        {"--spec-ngram-min-hits"}, "N",
-        string_format("minimum hits for ngram-map speculative decoding (default: %d)", params.speculative.ngram_min_hits),
+        {"--spec-ngram-simple-min-hits"}, "N",
+        string_format("minimum hits for ngram-simple speculative decoding (default: %d)", params.speculative.ngram_simple.min_hits),
         [](common_params & params, int value) {
             if (value < 1) {
                 throw std::invalid_argument("ngram min hits must be at least 1");
             }
-            params.speculative.ngram_min_hits = value;
+            params.speculative.ngram_simple.min_hits = value;
         }
-    ).set_examples({LLAMA_EXAMPLE_SERVER}));
+    ).set_examples({LLAMA_EXAMPLE_SPECULATIVE, LLAMA_EXAMPLE_SERVER, LLAMA_EXAMPLE_CLI}));
+
     add_opt(common_arg(
-        {"-ctkd", "--cache-type-k-draft"}, "TYPE",
-        string_format(
-            "KV cache data type for K for the draft model\n"
-            "allowed values: %s\n"
-            "(default: %s)",
-            get_all_kv_cache_types().c_str(),
-            ggml_type_name(params.speculative.cache_type_k)
-        ),
-        [](common_params & params, const std::string & value) {
-            params.speculative.cache_type_k = kv_cache_type_from_str(value);
+        {"--spec-ngram-map-k-size-n"}, "N",
+        string_format("ngram size N for ngram-map-k speculative decoding, length of lookup n-gram (default: %d)", params.speculative.ngram_map_k.size_n),
+        [](common_params & params, int value) {
+            if (value < 1 || value > 1024) {
+                throw std::invalid_argument("ngram size N must be between 1 and 1024 inclusive");
+            }
+            params.speculative.ngram_map_k.size_n = value;
         }
-    ).set_env("LLAMA_ARG_CACHE_TYPE_K_DRAFT"));
+    ).set_examples({LLAMA_EXAMPLE_SPECULATIVE, LLAMA_EXAMPLE_SERVER, LLAMA_EXAMPLE_CLI}));
     add_opt(common_arg(
-        {"-ctvd", "--cache-type-v-draft"}, "TYPE",
-        string_format(
-            "KV cache data type for V for the draft model\n"
-            "allowed values: %s\n"
-            "(default: %s)",
-            get_all_kv_cache_types().c_str(),
-            ggml_type_name(params.speculative.cache_type_v)
-        ),
-        [](common_params & params, const std::string & value) {
-            params.speculative.cache_type_v = kv_cache_type_from_str(value);
+        {"--spec-ngram-map-k-size-m"}, "N",
+        string_format("ngram size M for ngram-map-k speculative decoding, length of draft m-gram (default: %d)", params.speculative.ngram_map_k.size_m),
+        [](common_params & params, int value) {
+            if (value < 1 || value > 1024) {
+                throw std::invalid_argument("ngram size M must be between 1 and 1024 inclusive");
+            }
+            params.speculative.ngram_map_k.size_m = value;
         }
-    ).set_env("LLAMA_ARG_CACHE_TYPE_V_DRAFT"));
+    ).set_examples({LLAMA_EXAMPLE_SPECULATIVE, LLAMA_EXAMPLE_SERVER, LLAMA_EXAMPLE_CLI}));
+    add_opt(common_arg(
+        {"--spec-ngram-map-k-min-hits"}, "N",
+        string_format("minimum hits for ngram-map-k speculative decoding (default: %d)", params.speculative.ngram_map_k.min_hits),
+        [](common_params & params, int value) {
+            if (value < 1) {
+                throw std::invalid_argument("ngram min hits must be at least 1");
+            }
+            params.speculative.ngram_map_k.min_hits = value;
+        }
+    ).set_examples({LLAMA_EXAMPLE_SPECULATIVE, LLAMA_EXAMPLE_SERVER, LLAMA_EXAMPLE_CLI}));
+
+    add_opt(common_arg(
+        {"--spec-ngram-map-k4v-size-n"}, "N",
+        string_format("ngram size N for ngram-map-k4v speculative decoding, length of lookup n-gram (default: %d)", params.speculative.ngram_map_k4v.size_n),
+        [](common_params & params, int value) {
+            if (value < 1 || value > 1024) {
+                throw std::invalid_argument("ngram size N must be between 1 and 1024 inclusive");
+            }
+            params.speculative.ngram_map_k4v.size_n = value;
+        }
+    ).set_examples({LLAMA_EXAMPLE_SPECULATIVE, LLAMA_EXAMPLE_SERVER, LLAMA_EXAMPLE_CLI}));
+    add_opt(common_arg(
+        {"--spec-ngram-map-k4v-size-m"}, "N",
+        string_format("ngram size M for ngram-map-k4v speculative decoding, length of draft m-gram (default: %d)", params.speculative.ngram_map_k4v.size_m),
+        [](common_params & params, int value) {
+            if (value < 1 || value > 1024) {
+                throw std::invalid_argument("ngram size M must be between 1 and 1024 inclusive");
+            }
+            params.speculative.ngram_map_k4v.size_m = value;
+        }
+    ).set_examples({LLAMA_EXAMPLE_SPECULATIVE, LLAMA_EXAMPLE_SERVER, LLAMA_EXAMPLE_CLI}));
+    add_opt(common_arg(
+        {"--spec-ngram-map-k4v-min-hits"}, "N",
+        string_format("minimum hits for ngram-map-k4v speculative decoding (default: %d)", params.speculative.ngram_map_k4v.min_hits),
+        [](common_params & params, int value) {
+            if (value < 1) {
+                throw std::invalid_argument("ngram min hits must be at least 1");
+            }
+            params.speculative.ngram_map_k4v.min_hits = value;
+        }
+    ).set_examples({LLAMA_EXAMPLE_SPECULATIVE, LLAMA_EXAMPLE_SERVER, LLAMA_EXAMPLE_CLI}));
+
+    //
+    // TTS params
+    //
 
     add_opt(common_arg(
         {"-mv", "--model-vocoder"}, "FNAME",
@@ -3616,6 +3718,10 @@ common_params_context common_params_parser_init(common_params & params, llama_ex
             params.vocoder.speaker_file = value;
         }
     ).set_examples({LLAMA_EXAMPLE_TTS}));
+
+    //
+    // diffusion params
+    //
 
     add_opt(common_arg(
         {"--diffusion-steps"}, "N",
@@ -3801,8 +3907,8 @@ common_params_context common_params_parser_init(common_params & params, llama_ex
         [](common_params & params) {
             params.model.hf_repo = "ggml-org/Qwen2.5-Coder-7B-Q8_0-GGUF";
             params.model.hf_file = "qwen2.5-coder-7b-q8_0.gguf";
-            params.speculative.mparams_dft.hf_repo = "ggml-org/Qwen2.5-Coder-0.5B-Q8_0-GGUF";
-            params.speculative.mparams_dft.hf_file = "qwen2.5-coder-0.5b-q8_0.gguf";
+            params.speculative.draft.mparams.hf_repo = "ggml-org/Qwen2.5-Coder-0.5B-Q8_0-GGUF";
+            params.speculative.draft.mparams.hf_file = "qwen2.5-coder-0.5b-q8_0.gguf";
             params.port = 8012;
             params.n_ubatch = 1024;
             params.n_batch = 1024;
@@ -3817,8 +3923,8 @@ common_params_context common_params_parser_init(common_params & params, llama_ex
         [](common_params & params) {
             params.model.hf_repo = "ggml-org/Qwen2.5-Coder-14B-Q8_0-GGUF";
             params.model.hf_file = "qwen2.5-coder-14b-q8_0.gguf";
-            params.speculative.mparams_dft.hf_repo = "ggml-org/Qwen2.5-Coder-0.5B-Q8_0-GGUF";
-            params.speculative.mparams_dft.hf_file = "qwen2.5-coder-0.5b-q8_0.gguf";
+            params.speculative.draft.mparams.hf_repo = "ggml-org/Qwen2.5-Coder-0.5B-Q8_0-GGUF";
+            params.speculative.draft.mparams.hf_file = "qwen2.5-coder-0.5b-q8_0.gguf";
             params.port = 8012;
             params.n_ubatch = 1024;
             params.n_batch = 1024;
@@ -3907,9 +4013,9 @@ common_params_context common_params_parser_init(common_params & params, llama_ex
         string_format("enable default speculative decoding config"),
         [](common_params & params) {
             params.speculative.type = COMMON_SPECULATIVE_TYPE_NGRAM_MOD;
-            params.speculative.ngram_size_n = 24;
-            params.speculative.n_min = 48;
-            params.speculative.n_max = 64;
+            params.speculative.ngram_mod.n_match = 24;
+            params.speculative.ngram_mod.n_min = 48;
+            params.speculative.ngram_mod.n_max = 64;
         }
     ).set_examples({LLAMA_EXAMPLE_SERVER, LLAMA_EXAMPLE_CLI}));
 
