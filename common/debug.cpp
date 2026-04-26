@@ -47,7 +47,7 @@ static float common_ggml_get_float_value(const uint8_t * data,
 
 #define INDENT "    "
 
-void common_debug_print_tensor(uint8_t * data, ggml_type type, const int64_t * ne, const size_t * nb, int64_t n, bool abort_on_nan) {
+static void common_debug_print_tensor(uint8_t * data, ggml_type type, const int64_t * ne, const size_t * nb, int64_t n, bool abort_on_nan) {
     GGML_ASSERT(n > 0);
     float sum = 0;
     for (int64_t i3 = 0; i3 < ne[3]; i3++) {
@@ -112,7 +112,7 @@ void common_debug_print_tensor(uint8_t * data, ggml_type type, const int64_t * n
  * @return true to receive data or continue the graph, false otherwise
  */
 bool common_debug_cb_eval(struct ggml_tensor * t, bool ask, void * user_data) {
-    auto * cb_data = (base_callback_data *) user_data;
+    auto * cb_data = (common_debug_cb_user_data *) user_data;
 
     const struct ggml_tensor * src0 = t->src[0];
     const struct ggml_tensor * src1 = t->src[1];

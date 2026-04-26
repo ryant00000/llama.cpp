@@ -6,32 +6,23 @@
 
 // common debug functions and structs
 
-// Print a tensor's detailed data
-// data - the tensor's data in byte format
-// type - the tensor's quantization type
-// ne   - the tensor dimensions array
-// nb   - the tensor strides array
-// n    - the number of rows/columns to fully print
-// aon  - abort if NaN is encountered
-void common_debug_print_tensor(uint8_t * data, ggml_type type, const int64_t * ne, const size_t * nb, int64_t n, bool aon = false);
-
 // Intended to use as callback for ggml_backend_sched_eval_callback
 // prints tensors that are processed in the computation graph
-// by default prints all tensors, but can be configured by creating a `base_callback_data` instance with
+// by default prints all tensors, but can be configured by creating a `common_debug_cb_user_data` instance with
 // non-empty filter_patterns. See examples/debug.ccp for possible usage patterns
-// `base_callback_data` contains `abort_on_nan` flag that determines whether an error should be thrown whenever a NaN is encountered
+// `common_debug_cb_user_data` contains `abort_on_nan` flag that determines whether an error should be thrown whenever a NaN is encountered
 // in a tensor (useful for stopping debug sessions on first erroneous tensor)
 // The callback data will be passed as the third parameter (user_data)
 bool common_debug_cb_eval(struct ggml_tensor * t, bool ask, void * user_data);
 
-struct base_callback_data {
+struct common_debug_cb_user_data {
     std::vector<uint8_t>    data;
     std::vector<std::regex> tensor_filters;
     bool                    abort_on_nan{false};
 
-    base_callback_data() = default;
+    common_debug_cb_user_data() = default;
 
-    base_callback_data(common_params & params, const std::vector<std::string> & filter_patterns, bool abort_on_nan = false) {
+    common_debug_cb_user_data(common_params & params, const std::vector<std::string> & filter_patterns, bool abort_on_nan = false) {
         for (const auto & pattern : filter_patterns) {
             try {
                 std::string anchored_pattern = "^" + pattern;

@@ -90,7 +90,7 @@ struct mtmd_cli_context {
     int n_threads    = 1;
     llama_pos n_past = 0;
 
-    base_callback_data cb_data;
+    common_debug_cb_user_data cb_data;
 
     mtmd_cli_context(common_params & params) : llama_init(common_init_from_params(params)) {
         model = llama_init->model();
