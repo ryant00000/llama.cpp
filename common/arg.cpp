@@ -97,8 +97,8 @@ common_arg & common_arg::set_env(const char * env) {
     return *this;
 }
 
-common_arg & common_arg::set_sparam() {
-    is_sparam = true;
+common_arg & common_arg::set_sampling() {
+    is_sampling = true;
     return *this;
 }
 
@@ -651,12 +651,12 @@ static void common_params_print_usage(common_params_context & ctx_arg) {
     };
 
     std::vector<common_arg *> common_options;
-    std::vector<common_arg *> sparam_options;
+    std::vector<common_arg *> sampling_options;
     std::vector<common_arg *> specific_options;
     for (auto & opt : ctx_arg.options) {
         // in case multiple LLAMA_EXAMPLE_* are set, we prioritize the LLAMA_EXAMPLE_* matching current example
-        if (opt.is_sparam) {
-            sparam_options.push_back(&opt);
+        if (opt.is_sampling) {
+            sampling_options.push_back(&opt);
         } else if (opt.in_example(ctx_arg.ex)) {
             specific_options.push_back(&opt);
         } else {
@@ -666,7 +666,7 @@ static void common_params_print_usage(common_params_context & ctx_arg) {
     printf("----- common params -----\n\n");
     print_options(common_options);
     printf("\n\n----- sampling params -----\n\n");
-    print_options(sparam_options);
+    print_options(sampling_options);
     // TODO: maybe convert enum llama_example to string
     printf("\n\n----- example-specific params -----\n\n");
     print_options(specific_options);
@@ -674,12 +674,12 @@ static void common_params_print_usage(common_params_context & ctx_arg) {
 
 static void common_params_print_completion(common_params_context & ctx_arg) {
     std::vector<common_arg *> common_options;
-    std::vector<common_arg *> sparam_options;
+    std::vector<common_arg *> sampling_options;
     std::vector<common_arg *> specific_options;
 
     for (auto & opt : ctx_arg.options) {
-        if (opt.is_sparam) {
-            sparam_options.push_back(&opt);
+        if (opt.is_sampling) {
+            sampling_options.push_back(&opt);
         } else if (opt.in_example(ctx_arg.ex)) {
             specific_options.push_back(&opt);
         } else {
@@ -703,7 +703,7 @@ static void common_params_print_completion(common_params_context & ctx_arg) {
     };
 
     print_options(common_options);
-    print_options(sparam_options);
+    print_options(sampling_options);
     print_options(specific_options);
     printf("\"\n\n");
 
@@ -1576,28 +1576,28 @@ common_params_context common_params_parser_init(common_params & params, llama_ex
             params.sampling.samplers = common_sampler_types_from_names(sampler_names, true);
             params.sampling.user_sampling_config |= common_params_sampling_config::COMMON_PARAMS_SAMPLING_CONFIG_SAMPLERS;
         }
-    ).set_sparam());
+    ).set_sampling());
     add_opt(common_arg(
         {"-s", "--seed"}, "SEED",
         string_format("RNG seed (default: %d, use random seed for %d)", params.sampling.seed, LLAMA_DEFAULT_SEED),
         [](common_params & params, const std::string & value) {
             params.sampling.seed = std::stoul(value);
         }
-    ).set_sparam());
+    ).set_sampling());
     add_opt(common_arg(
         {"--sampler-seq", "--sampling-seq"}, "SEQUENCE",
         string_format("simplified sequence for samplers that will be used (default: %s)", sampler_type_chars.c_str()),
         [](common_params & params, const std::string & value) {
             params.sampling.samplers = common_sampler_types_from_chars(value);
         }
-    ).set_sparam());
+    ).set_sampling());
     add_opt(common_arg(
         {"--ignore-eos"},
         "ignore end of stream token and continue generating (implies --logit-bias EOS-inf)",
         [](common_params & params) {
             params.sampling.ignore_eos = true;
         }
-    ).set_sparam());
+    ).set_sampling());
     add_opt(common_arg(
         {"--temp", "--temperature"}, "N",
         string_format("temperature (default: %.2f)", (double)params.sampling.temp),
@@ -1606,7 +1606,7 @@ common_params_context common_params_parser_init(common_params & params, llama_ex
             params.sampling.temp = std::max(params.sampling.temp, 0.0f);
             params.sampling.user_sampling_config |= common_params_sampling_config::COMMON_PARAMS_SAMPLING_CONFIG_TEMP;
         }
-    ).set_sparam());
+    ).set_sampling());
     add_opt(common_arg(
         {"--top-k"}, "N",
         string_format("top-k sampling (default: %d, 0 = disabled)", params.sampling.top_k),
@@ -1614,7 +1614,7 @@ common_params_context common_params_parser_init(common_params & params, llama_ex
             params.sampling.top_k = value;
             params.sampling.user_sampling_config |= common_params_sampling_config::COMMON_PARAMS_SAMPLING_CONFIG_TOP_K;
         }
-    ).set_sparam().set_env("LLAMA_ARG_TOP_K"));
+    ).set_sampling().set_env("LLAMA_ARG_TOP_K"));
     add_opt(common_arg(
         {"--top-p"}, "N",
         string_format("top-p sampling (default: %.2f, 1.0 = disabled)", (double)params.sampling.top_p),
@@ -1622,7 +1622,7 @@ common_params_context common_params_parser_init(common_params & params, llama_ex
             params.sampling.top_p = std::stof(value);
             params.sampling.user_sampling_config |= common_params_sampling_config::COMMON_PARAMS_SAMPLING_CONFIG_TOP_P;
         }
-    ).set_sparam());
+    ).set_sampling());
     add_opt(common_arg(
         {"--min-p"}, "N",
         string_format("min-p sampling (default: %.2f, 0.0 = disabled)", (double)params.sampling.min_p),
@@ -1630,14 +1630,14 @@ common_params_context common_params_parser_init(common_params & params, llama_ex
             params.sampling.min_p = std::stof(value);
             params.sampling.user_sampling_config |= common_params_sampling_config::COMMON_PARAMS_SAMPLING_CONFIG_MIN_P;
         }
-    ).set_sparam());
+    ).set_sampling());
     add_opt(common_arg(
         {"--top-nsigma", "--top-n-sigma"}, "N",
         string_format("top-n-sigma sampling (default: %.2f, -1.0 = disabled)", params.sampling.top_n_sigma),
         [](common_params & params, const std::string & value) {
             params.sampling.top_n_sigma = std::stof(value);
         }
-    ).set_sparam());
+    ).set_sampling());
     add_opt(common_arg(
         {"--xtc-probability"}, "N",
         string_format("xtc probability (default: %.2f, 0.0 = disabled)", (double)params.sampling.xtc_probability),
@@ -1645,7 +1645,7 @@ common_params_context common_params_parser_init(common_params & params, llama_ex
             params.sampling.xtc_probability = std::stof(value);
             params.sampling.user_sampling_config |= common_params_sampling_config::COMMON_PARAMS_SAMPLING_CONFIG_XTC_PROBABILITY;
         }
-    ).set_sparam());
+    ).set_sampling());
     add_opt(common_arg(
         {"--xtc-threshold"}, "N",
         string_format("xtc threshold (default: %.2f, 1.0 = disabled)", (double)params.sampling.xtc_threshold),
@@ -1653,14 +1653,14 @@ common_params_context common_params_parser_init(common_params & params, llama_ex
             params.sampling.xtc_threshold = std::stof(value);
             params.sampling.user_sampling_config |= common_params_sampling_config::COMMON_PARAMS_SAMPLING_CONFIG_XTC_THRESHOLD;
         }
-    ).set_sparam());
+    ).set_sampling());
     add_opt(common_arg(
         {"--typical", "--typical-p"}, "N",
         string_format("locally typical sampling, parameter p (default: %.2f, 1.0 = disabled)", (double)params.sampling.typ_p),
         [](common_params & params, const std::string & value) {
             params.sampling.typ_p = std::stof(value);
         }
-    ).set_sparam());
+    ).set_sampling());
     add_opt(common_arg(
         {"--repeat-last-n"}, "N",
         string_format("last n tokens to consider for penalize (default: %d, 0 = disabled, -1 = ctx_size)", params.sampling.penalty_last_n),
@@ -1672,7 +1672,7 @@ common_params_context common_params_parser_init(common_params & params, llama_ex
             params.sampling.n_prev = std::max(params.sampling.n_prev, params.sampling.penalty_last_n);
             params.sampling.user_sampling_config |= common_params_sampling_config::COMMON_PARAMS_SAMPLING_CONFIG_PENALTY_LAST_N;
         }
-    ).set_sparam());
+    ).set_sampling());
     add_opt(common_arg(
         {"--repeat-penalty"}, "N",
         string_format("penalize repeat sequence of tokens (default: %.2f, 1.0 = disabled)", (double)params.sampling.penalty_repeat),
@@ -1680,28 +1680,28 @@ common_params_context common_params_parser_init(common_params & params, llama_ex
             params.sampling.penalty_repeat = std::stof(value);
             params.sampling.user_sampling_config |= common_params_sampling_config::COMMON_PARAMS_SAMPLING_CONFIG_PENALTY_REPEAT;
         }
-    ).set_sparam());
+    ).set_sampling());
     add_opt(common_arg(
         {"--presence-penalty"}, "N",
         string_format("repeat alpha presence penalty (default: %.2f, 0.0 = disabled)", (double)params.sampling.penalty_present),
         [](common_params & params, const std::string & value) {
             params.sampling.penalty_present = std::stof(value);
         }
-    ).set_sparam());
+    ).set_sampling());
     add_opt(common_arg(
         {"--frequency-penalty"}, "N",
         string_format("repeat alpha frequency penalty (default: %.2f, 0.0 = disabled)", (double)params.sampling.penalty_freq),
         [](common_params & params, const std::string & value) {
             params.sampling.penalty_freq = std::stof(value);
         }
-    ).set_sparam());
+    ).set_sampling());
     add_opt(common_arg(
         {"--dry-multiplier"}, "N",
         string_format("set DRY sampling multiplier (default: %.2f, 0.0 = disabled)", (double)params.sampling.dry_multiplier),
         [](common_params & params, const std::string & value) {
             params.sampling.dry_multiplier = std::stof(value);
         }
-    ).set_sparam());
+    ).set_sampling());
     add_opt(common_arg(
         {"--dry-base"}, "N",
         string_format("set DRY sampling base value (default: %.2f)", (double)params.sampling.dry_base),
@@ -1712,14 +1712,14 @@ common_params_context common_params_parser_init(common_params & params, llama_ex
                 params.sampling.dry_base = potential_base;
             }
         }
-    ).set_sparam());
+    ).set_sampling());
     add_opt(common_arg(
         {"--dry-allowed-length"}, "N",
         string_format("set allowed length for DRY sampling (default: %d)", params.sampling.dry_allowed_length),
         [](common_params & params, int value) {
             params.sampling.dry_allowed_length = value;
         }
-    ).set_sparam());
+    ).set_sampling());
     add_opt(common_arg(
         {"--dry-penalty-last-n"}, "N",
         string_format("set DRY penalty for the last n tokens (default: %d, 0 = disable, -1 = context size)", params.sampling.dry_penalty_last_n),
@@ -1729,7 +1729,7 @@ common_params_context common_params_parser_init(common_params & params, llama_ex
             }
             params.sampling.dry_penalty_last_n = value;
         }
-    ).set_sparam());
+    ).set_sampling());
     add_opt(common_arg(
         {"--dry-sequence-breaker"}, "STRING",
         string_format("add sequence breaker for DRY sampling, clearing out default breakers (%s) in the process; use \"none\" to not use any sequence breakers\n",
@@ -1755,7 +1755,7 @@ common_params_context common_params_parser_init(common_params & params, llama_ex
                 params.sampling.dry_sequence_breakers.emplace_back(value);
             }
         }
-    ).set_sparam());
+    ).set_sampling());
     add_opt(common_arg(
         {"--adaptive-target"}, "N",
         string_format("adaptive-p: select tokens near this probability (valid range 0.0 "
@@ -1765,7 +1765,7 @@ common_params_context common_params_parser_init(common_params & params, llama_ex
         [](common_params & params, const std::string & value) {
             params.sampling.adaptive_target = std::stof(value);
         }
-    ).set_sparam());
+    ).set_sampling());
     add_opt(common_arg(
         {"--adaptive-decay"}, "N",
         string_format("adaptive-p: decay rate for target adaptation over time. lower values "
@@ -1775,21 +1775,21 @@ common_params_context common_params_parser_init(common_params & params, llama_ex
         [](common_params & params, const std::string & value) {
             params.sampling.adaptive_decay = std::stof(value);
         }
-    ).set_sparam());
+    ).set_sampling());
     add_opt(common_arg(
         {"--dynatemp-range"}, "N",
         string_format("dynamic temperature range (default: %.2f, 0.0 = disabled)", (double)params.sampling.dynatemp_range),
         [](common_params & params, const std::string & value) {
             params.sampling.dynatemp_range = std::stof(value);
         }
-    ).set_sparam());
+    ).set_sampling());
     add_opt(common_arg(
         {"--dynatemp-exp"}, "N",
         string_format("dynamic temperature exponent (default: %.2f)", (double)params.sampling.dynatemp_exponent),
         [](common_params & params, const std::string & value) {
             params.sampling.dynatemp_exponent = std::stof(value);
         }
-    ).set_sparam());
+    ).set_sampling());
     add_opt(common_arg(
         {"--mirostat"}, "N",
         string_format("use Mirostat sampling.\nTop K, Nucleus and Locally Typical samplers are ignored if used.\n"
@@ -1798,7 +1798,7 @@ common_params_context common_params_parser_init(common_params & params, llama_ex
             params.sampling.mirostat = value;
             params.sampling.user_sampling_config |= common_params_sampling_config::COMMON_PARAMS_SAMPLING_CONFIG_MIROSTAT;
         }
-    ).set_sparam());
+    ).set_sampling());
     add_opt(common_arg(
         {"--mirostat-lr"}, "N",
         string_format("Mirostat learning rate, parameter eta (default: %.2f)", (double)params.sampling.mirostat_eta),
@@ -1806,7 +1806,7 @@ common_params_context common_params_parser_init(common_params & params, llama_ex
             params.sampling.mirostat_eta = std::stof(value);
             params.sampling.user_sampling_config |= common_params_sampling_config::COMMON_PARAMS_SAMPLING_CONFIG_MIROSTAT_ETA;
         }
-    ).set_sparam());
+    ).set_sampling());
     add_opt(common_arg(
         {"--mirostat-ent"}, "N",
         string_format("Mirostat target entropy, parameter tau (default: %.2f)", (double)params.sampling.mirostat_tau),
@@ -1814,7 +1814,7 @@ common_params_context common_params_parser_init(common_params & params, llama_ex
             params.sampling.mirostat_tau = std::stof(value);
             params.sampling.user_sampling_config |= common_params_sampling_config::COMMON_PARAMS_SAMPLING_CONFIG_MIROSTAT_TAU;
         }
-    ).set_sparam());
+    ).set_sampling());
     add_opt(common_arg(
         {"-l", "--logit-bias"}, "TOKEN_ID(+/-)BIAS",
         "modifies the likelihood of token appearing in the completion,\n"
@@ -1836,28 +1836,28 @@ common_params_context common_params_parser_init(common_params & params, llama_ex
                 throw std::invalid_argument("invalid input format");
             }
         }
-    ).set_sparam());
+    ).set_sampling());
     add_opt(common_arg(
         {"--grammar"}, "GRAMMAR",
         "BNF-like grammar to constrain generations (see samples in grammars/ dir)",
         [](common_params & params, const std::string & value) {
             params.sampling.grammar = {COMMON_GRAMMAR_TYPE_USER, value};
         }
-    ).set_sparam());
+    ).set_sampling());
     add_opt(common_arg(
         {"--grammar-file"}, "FNAME",
         "file to read grammar from",
         [](common_params & params, const std::string & value) {
             params.sampling.grammar = {COMMON_GRAMMAR_TYPE_USER, read_file(value)};
         }
-    ).set_sparam());
+    ).set_sampling());
     add_opt(common_arg(
         {"-j", "--json-schema"}, "SCHEMA",
         "JSON schema to constrain generations (https://json-schema.org/), e.g. `{}` for any JSON object\nFor schemas w/ external $refs, use --grammar + example/json_schema_to_grammar.py instead",
         [](common_params & params, const std::string & value) {
             params.sampling.grammar = {COMMON_GRAMMAR_TYPE_OUTPUT_FORMAT, json_schema_to_grammar(json::parse(value))};
         }
-    ).set_sparam());
+    ).set_sampling());
     add_opt(common_arg(
         {"-jf", "--json-schema-file"}, "FILE",
         "File containing a JSON schema to constrain generations (https://json-schema.org/), e.g. `{}` for any JSON object\nFor schemas w/ external $refs, use --grammar + example/json_schema_to_grammar.py instead",
@@ -1874,14 +1874,14 @@ common_params_context common_params_parser_init(common_params & params, llama_ex
             );
             params.sampling.grammar = {COMMON_GRAMMAR_TYPE_OUTPUT_FORMAT, json_schema_to_grammar(json::parse(schema))};
         }
-    ).set_sparam());
+    ).set_sampling());
     add_opt(common_arg(
         {"-bs", "--backend-sampling"},
         "enable backend sampling (experimental) (default: disabled)",
         [](common_params & params) {
             params.sampling.backend_sampling = true;
         }
-    ).set_sparam().set_env("LLAMA_ARG_BACKEND_SAMPLING"));
+    ).set_sampling().set_env("LLAMA_ARG_BACKEND_SAMPLING"));
     add_opt(common_arg(
         {"--pooling"}, "{none,mean,cls,last,rank}",
         "pooling type for embeddings, use model default if unspecified",
