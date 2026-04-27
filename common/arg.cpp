@@ -3340,7 +3340,7 @@ common_params_context common_params_parser_init(common_params & params, llama_ex
                 params.speculative.draft.cpuparams_batch.n_threads = std::thread::hardware_concurrency();
             }
         }
-    ).set_examples({LLAMA_EXAMPLE_SPECULATIVE, LLAMA_EXAMPLE_SERVER, LLAMA_EXAMPLE_CLI}));
+    ).set_spec().set_examples({LLAMA_EXAMPLE_SPECULATIVE, LLAMA_EXAMPLE_SERVER, LLAMA_EXAMPLE_CLI}));
     add_opt(common_arg(
         {"--spec-draft-cpu-mask", "-Cd", "--cpu-mask-draft"}, "M",
         "Draft model CPU affinity mask. Complements cpu-range-draft (default: same as --cpu-mask)",
