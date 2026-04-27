@@ -26,6 +26,7 @@ struct common_arg {
     const char * env          = nullptr;
     std::string help;
     bool is_sampling = false; // is current arg a sampling param?
+    bool is_spec = false; // is current arg a speculative decoding param?
     bool is_preset_only = false; // is current arg preset-only (not treated as CLI arg)
     void (*handler_void)   (common_params & params) = nullptr;
     void (*handler_string) (common_params & params, const std::string &) = nullptr;
@@ -75,6 +76,7 @@ struct common_arg {
     common_arg & set_excludes(std::initializer_list<enum llama_example> excludes);
     common_arg & set_env(const char * env);
     common_arg & set_sampling();
+    common_arg & set_spec();
     common_arg & set_preset_only();
     bool in_example(enum llama_example ex);
     bool is_exclude(enum llama_example ex);
