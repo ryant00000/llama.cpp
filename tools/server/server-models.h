@@ -67,6 +67,7 @@ struct server_model_meta {
     int exit_code = 0; // exit code of the model instance process (only valid if status == FAILED)
     int stop_timeout = 0; // seconds to wait before force-killing the model instance during shutdown
     mtmd_caps multimodal; // multimodal capabilities
+    int in_progress_requests = 0; // number of in-progress requests (for LRU unloading with continuous batching)
 
     bool is_ready() const {
         return status == SERVER_MODEL_STATUS_LOADED;
@@ -105,6 +106,8 @@ private:
 
     // set to true while load_models() is executing a reload; load() will wait until clear
     bool is_reloading = false;
+    // for waiting on in-progress requests to drain before LRU eviction
+    std::condition_variable cv_in_progress;
 
     common_preset_context ctx_preset;
 
@@ -160,7 +163,7 @@ public:
     bool ensure_model_ready(const std::string & name);
 
     // proxy an HTTP request to the model instance
-    server_http_res_ptr proxy_request(const server_http_req & req, const std::string & method, const std::string & name, bool update_last_used);
+    server_http_res_ptr proxy_request(const server_http_req & req, const std::string & method, const std::string & name, bool update_last_used, bool track_in_progress);
 
     // return true if the current process is a child server instance
     static bool is_child_server();
