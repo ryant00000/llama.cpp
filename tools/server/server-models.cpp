@@ -510,6 +510,10 @@ void server_models::unload_lru() {
         for (const auto & m : mapping) {
             if (m.second.meta.is_running()) {
                 count_active++;
+                // skip models with in-progress requests to respect continuous batching
+                if (m.second.meta.in_progress_requests > 0) {
+                    continue;
+                }
                 if (m.second.meta.last_used < lru_last_used) {
                     lru_model_name = m.first;
                     lru_last_used = m.second.meta.last_used;
@@ -800,7 +804,7 @@ bool server_models::ensure_model_ready(const std::string & name) {
     return true;
 }
 
-server_http_res_ptr server_models::proxy_request(const server_http_req & req, const std::string & method, const std::string & name, bool update_last_used) {
+server_http_res_ptr server_models::proxy_request(const server_http_req & req, const std::string & method, const std::string & name, bool update_last_used, bool track_in_progress) {
     auto meta = get_meta(name);
     if (!meta.has_value()) {
         throw std::runtime_error("model name=" + name + " is not found");
@@ -808,9 +812,14 @@ server_http_res_ptr server_models::proxy_request(const server_http_req & req, co
     if (!meta->is_running()) {
         throw std::invalid_argument("model name=" + name + " is not running");
     }
-    if (update_last_used) {
+    {
         std::unique_lock<std::mutex> lk(mutex);
-        mapping[name].meta.last_used = ggml_time_ms();
+        if (update_last_used) {
+            mapping[name].meta.last_used = ggml_time_ms();
+        }
+        if (track_in_progress) {
+            mapping[name].meta.in_progress_requests++;
+        }
     }
     SRV_INF("proxying request to model %s on port %d\n", name.c_str(), meta->port);
     std::string proxy_path = req.path;
@@ -830,6 +839,16 @@ server_http_res_ptr server_models::proxy_request(const server_http_req & req, co
             base_params.timeout_read,
             base_params.timeout_write
             );
+    if (track_in_progress) {
+        auto cleanup_proxy = proxy.get();
+        proxy->cleanup = [this, name, cleanup_proxy]() {
+            std::unique_lock<std::mutex> lk(mutex);
+            auto it = mapping.find(name);
+            if (it != mapping.end() && it->second.meta.in_progress_requests > 0) {
+                it->second.meta.in_progress_requests--;
+            }
+        };
+    }
     return proxy;
 }
 
@@ -960,7 +979,7 @@ void server_models_routes::init_routes() {
         if (!router_validate_model(name, models, autoload, error_res)) {
             return error_res;
         }
-        return models.proxy_request(req, method, name, false);
+        return models.proxy_request(req, method, name, false, false);
     };
 
     this->proxy_post = [this](const server_http_req & req) {
@@ -972,7 +991,7 @@ void server_models_routes::init_routes() {
         if (!router_validate_model(name, models, autoload, error_res)) {
             return error_res;
         }
-        return models.proxy_request(req, method, name, true); // update last usage for POST request only
+        return models.proxy_request(req, method, name, true, true); // update last usage and track in-progress for POST request only
     };
 
     this->post_router_models_load = [this](const server_http_req & req) {
